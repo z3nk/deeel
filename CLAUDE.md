@@ -5,9 +5,32 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 
 ## Rules
 - Python only, SQLite for storage, Streamlit for the UI.
-- Do NOT write code until I say "start building". Planning and questions only.
 - No scraping. Data comes from in-store photos and a hand-collected seed walk.
 - Allergen and diet info comes only from printed label text. Unknown means unsafe.
 - Credits are paid only when a record is approved. Pending items are shown but unpaid.
 - Never commit .env or the API key.
 - Keep the app fast: load the DB once, cache results, call Claude only on button or upload.
+
+## Preferences and controls
+- Preferences are set through sidebar controls only: allergen chips, diet chips, max price slider, walking limit slider, hot/cold/any toggle, loyalty card toggle, sort dropdown.
+- Free-text preference input ("cheap, warm, vegetarian") is a stretch feature. Do not build it until after the 1:30 hackathon gate.
+- The sort dropdown (Quality / Distance / Price) maps to score weights in the optimiser — see PLAN.md.
+
+## Results output
+- Results are shown in three sections: one featured best option (Section A), up to 3 alternatives at the same shop varying the main (Section B), up to 3 other shops (Section C).
+- The optimiser exposes `get_results(shops, items, deals, prefs) -> (primary, alternatives, other_shops)`.
+- Stale items (> 14 days) are excluded from ranking but shown greyed below all sections.
+
+## Map
+- A map view tab sits alongside the list view tab on Screen 1.
+- Uses `streamlit-folium` + `folium` with OpenStreetMap tiles. No API key needed.
+- Shop markers are coloured by rank: green (#1), yellow (#2), orange (#3+), grey (out of range).
+- A dashed circle shows the walking-limit radius (minutes × 80 m/min).
+
+## Claude model
+- Use `claude-opus-4-6` for all vision extraction and "why" line generation.
+- Call Claude only on button press or file upload — never on a Streamlit re-render.
+
+## User identity
+- Name text input in the sidebar sets `st.session_state["username"]` as `user_id`.
+- No auth, no passwords. Handle only.

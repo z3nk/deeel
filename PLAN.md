@@ -1,25 +1,30 @@
 # Meal Deal Finder: Build Plan
 
-Oct 12, 2026 · @Neeam R
+Oct 12, 2026 · @Neeam R · **v2 — three-section results, map view, sidebar-only controls**
 
 ## Goal and scope
 
-We're building a lunch finder for the UCL Bloomsbury main campus. A student says what matters (price, ingredient quality, a warm lunch) and their dietary needs, and the app returns the best lunch within walking distance: the exact items to buy and why. Prices come from crowdsourced shelf-label photos, each dated and traceable to the photo it came from.
+We're building a lunch finder for the UCL Bloomsbury main campus. A student sets their preferences using sidebar controls (budget, walking limit, diet, allergens, loyalty cards) and the app returns the best lunch within walking distance: the exact items to buy and why. Prices come from crowdsourced shelf-label photos, each dated and traceable to the photo it came from.
 
 **In the MVP**
 
 - Claude vision turns a shelf-label or meal deal sign photo into a structured item or deal record.
 - Six chains near campus: Pret, M&S, Waitrose, Sainsbury's, Tesco, Lidl.
-- Preferences as free text ("cheap, warm, vegetarian, no nuts") or sliders, plus a loyalty-card toggle.
-- An exact optimiser: the best main + snack + drink per shop, comparing the meal deal against buying items separately.
-- Ranked results with price, walking minutes from campus, last-seen date and a one-line "why".
+- Preferences via sidebar controls: max price slider, walking limit slider, hot/cold/any toggle, diet chips, allergen chips, loyalty card toggle, sort dropdown (Quality · Distance · Price).
+- An exact optimiser: the best main + snack + drink per shop, comparing meal deal against buying separately.
+- Three-section results: one featured best option, up to 3 alternative baskets at the same shop, up to 3 other shops.
+- Map view tab: OpenStreetMap with shop markers coloured by rank and a walking-limit radius circle.
+- Each result card shows price, walking minutes, last-seen date and a one-line "why" written by Claude.
 
-**Stretch (only after the gate in Hackathon day)**
+**Stretch (only after the 1:30 gate on hackathon day)**
 
+- Free-text preference input ("cheap, warm, vegetarian, no nuts") parsed by Claude into sidebar controls.
 - Student ratings of items to feed the quality score.
 - Live location instead of the campus default.
 
-**Out of scope:** scraping chain websites (photos first), allergy or medical advice (we show label data, not advice), payments, ordering and full accounts (a light sign-in to hold credits is in scope).
+**Out of scope:** scraping chain websites (photos only), allergy or medical advice (we show label data, not advice), payments, ordering, full accounts (a name-based sign-in for credits is in scope).
+
+---
 
 ## What we know about the data
 
@@ -27,11 +32,11 @@ Only Tesco, Sainsbury's and Waitrose clearly sell a standard main + snack + drin
 
 | Chain | Meal deal found | Price | Source |
 | --- | --- | --- | --- |
-| Tesco | Yes | £4.25, or £3.85 with Clubcard. Premium £6, or £5.50 with a loyalty card | [Grocery Gazette](https://www.grocerygazette.co.uk/2026/10/06/tesco-launches-festive-meal-deal-range/), [Retail Gazette](https://www.retailgazette.co.uk/?p=191928) |
+| Tesco | Yes | £4.25, or £3.85 with Clubcard. Premium £6, or £5.50 with loyalty card | [Grocery Gazette](https://www.grocerygazette.co.uk/2026/10/06/tesco-launches-festive-meal-deal-range/), [Retail Gazette](https://www.retailgazette.co.uk/?p=191928) |
 | Sainsbury's | Yes | £3.95. Premium £5 or £5.50 (sources differ; check the shelf) | [Food Manufacture](https://www.foodmanufacture.co.uk/Article/2025/06/23/sainsburys-raises-meal-deal-price/), [Student Beans](https://www.studentbeans.com/blog/uk/best-supermarket-meal-deals-in-the-uk) |
 | Waitrose | Yes | £5.50 | [Grocery Gazette](https://www.grocerygazette.co.uk/2026/06/15/waitrose-meal-deal-price/) |
 | M&S | No lunch deal found | Only evening Dine In offers found | Confirm on the seed walk |
-| Lidl | No lunch deal found | A Lidl director has said it doesn't rely on meal deals (undated article) | [Woman&Home](https://womanandhome.com/life/news-entertainment/lidl-meal-deal-marks-and-spencer-305353) |
+| Lidl | No lunch deal found | A Lidl director has said it doesn't rely on meal deals | [Woman&Home](https://womanandhome.com/life/news-entertainment/lidl-meal-deal-marks-and-spencer-305353) |
 | Pret | Unclear | A meal deal trial was announced; price and rollout unconfirmed | [Marketing Week](https://www.marketingweek.com/pret-meal-deal-value/) |
 
 **Shops near the campus.** Addresses are leads to confirm on the seed walk, not facts to build on.
@@ -42,8 +47,10 @@ Only Tesco, Sainsbury's and Waitrose clearly sell a standard main + snack + drin
 | Lidl | 145 Tottenham Court Road | Same blog; confirm |
 | M&S Food | 15-17 Tottenham Court Road (opened 9 June 2026), plus a small outlet inside UCLH | [Fitzrovia News](https://fitzrovianews.com/2026/01/09/ms-food-to-move-to-larger-tottenham-court-road-store/) |
 | Sainsbury's | Moved to smaller premises on Tottenham Court Road at the end of 2025; address not found | Confirm |
-| Waitrose | Possibly The Brunswick Centre (23-39) and a Little Waitrose on Tottenham Court Road | Undated [pages](https://therai.org.uk/conferences/anthropology-and-photography/food-and-drink); confirm |
+| Waitrose | Possibly The Brunswick Centre (23-39) and a Little Waitrose on Tottenham Court Road | Undated; confirm |
 | Pret | Not checked | Confirm |
+
+---
 
 ## Team and roles
 
@@ -51,135 +58,103 @@ Three people, three owners, one frozen schema. Swap names in once assigned.
 
 | Person | Role | Owns | Done when |
 | --- | --- | --- | --- |
-| Intermediate Python #1 | Extraction | `extract_item.py`: label or deal-sign photo to validated item or deal JSON, plus the review queue data | Every seed-walk photo extracts with price, diet flags and allergens matching the label, or is flagged `needs_review` |
-| Intermediate Python #2 | Optimiser | Hard filters, scoring, per-shop search, and the prompt that turns free text into filters and sliders | Unit tests pass on 3 invented shops; 10 free-text phrasings produce the right filters |
-| Beginner | UI, seed data, demo | Streamlit app, shop list with walking minutes, seed walk coordination, demo script | A stranger can run the full flow from the UI without help |
+| Intermediate Python #1 | Extraction | `extract.py`: label or deal-sign photo to validated item or deal JSON, plus the review queue data | Every seed-walk photo extracts with price, diet flags and allergens matching the label, or is flagged `needs_review` |
+| Intermediate Python #2 | Optimiser | Hard filters, scoring, per-shop search, three-section results output, "why" line generation | Unit tests pass on 3 invented shops; three-section output returns correct primary + alternatives |
+| Beginner | UI, seed data, demo | Streamlit app, sidebar controls, three-section results display, map view, seed walk coordination, demo script | A stranger can run the full flow from the UI without help |
 
-All three use Claude (or Claude Code) to write most of the code. Whoever owns a file reviews every change to it, so vibe-coded output still gets read by a human.
+All three use Claude (or Claude Code) to write most of the code. Whoever owns a file reviews every change to it.
+
+---
 
 ## Tech stack and repo layout
 
-Python for all the logic, SQL for the SQLite store, Streamlit for the UI. One language means all three of us can read each other's code.
+Python for all the logic, SQL for the SQLite store, Streamlit for the UI.
 
 | Element | Language and tools |
 | --- | --- |
-| Photo extraction | Python, `anthropic` SDK, output validated with Pydantic |
-| Free-text parsing and the "why" line | Python, Claude API returning JSON, validated with Pydantic |
+| Photo extraction | Python, `anthropic` SDK (`claude-opus-4-6`), output validated with Pydantic |
+| "Why" line | Python, Claude API returning plain text, using only result fields |
 | Storage | SQLite via Python's built-in `sqlite3`; queries are plain SQL |
 | Optimiser | Plain Python, tested with `pytest` |
 | Credit ledger and earning rules | Python plus a SQLite table |
-| Duplicate-photo check, location metadata removal | Python with Pillow and an image-hash library such as `imagehash` |
+| Duplicate-photo check, location metadata removal | Python with Pillow and `imagehash` |
 | UI | Streamlit (Python, runs as a local web app) |
+| Map | `streamlit-folium` + `folium` (Leaflet/OpenStreetMap, no API key) |
 | Secrets | `.env` read with `python-dotenv`; `.env` in `.gitignore` |
-| Seed shops and walking minutes | A JSON or CSV file |
+| Seed shops and walking minutes | Hardcoded in `db.py`; confirmed and updated after the seed walk |
 
 ```text
 meal-deal-finder/
   app.py            Streamlit UI (beginner)
   extract.py        photo to item or deal JSON, review queue (#1)
-  optimiser.py      filters, scoring, per-shop search (#2)
+  optimiser.py      filters, scoring, per-shop search, three-section output (#2)
+  map_view.py       Folium map helper (beginner)
   ledger.py         credit ledger, earning rules, rewards (#2)
   approval.py       pending/approved/rejected flow, pays credits on approval (#2)
   models.py         Pydantic schema, shared and frozen
-  db.py             SQLite schema, indexes, one shared connection
-  seed/             walk photos and seed shops
+  db.py             SQLite schema, indexes, one shared connection, seed shops
+  seed/             walk photos
   tests/            pytest
   .env              API key, never committed
   requirements.txt
 ```
 
-Speed: Streamlit re-runs the whole script every time someone moves a slider, so the app must do almost nothing on each rerun. Open the database once and reuse it (`st.cache_resource`). Cache search results (`st.cache_data`). Call Claude only when someone presses a button or uploads a photo, never on a rerun. Work out each "why this shop" line when the result is built, not when it is drawn. The optimiser is plain in-memory Python, so a search should take milliseconds. I haven't checked current library versions, so confirm them when you set up the project.
+Speed: load the database once (`st.cache_resource`), cache search results (`st.cache_data`), call Claude only on button press or file upload — never on a re-render.
 
-## Architecture
+---
 
-&#91;embedded content: pipeline · 4 stages, 2 ingest paths\]
+## Results output structure
 
-Photos enter by two routes and Claude turns each into schema-checked JSON. Flagged items wait in the review queue; the rest go to the store. The optimiser combines the store with the student's inputs and the campus walking times, and Claude also writes the one-line reason on each result card.
+The optimiser returns results in three sections. This is the shape the UI and the optimiser must agree on:
 
-## Credits and sponsor rewards
+**Section A — Primary recommendation (1 result)**
+The single top-scoring lunch across all shops. Displayed as a featured card with a primary-colour border.
 
-Students earn credits for approved photos and spend them on rewards that sponsors supply. Credits are paid for useful, checked data rather than volume, because a price that is wrong or an allergen that is misread is worse than a missing one. All amounts are starting values to tune.
+**Section B — Alternatives at the same shop (up to 3)**
+The next 2–3 best baskets at the top-ranked shop, varying the main item (different mains paired with the same best snack and drink). Displayed as secondary cards below the featured card.
 
-**Earning rules**
+**Section C — Other shops (up to 3)**
+The best lunch from the 2nd, 3rd and 4th ranked shops. Displayed as secondary cards under a divider.
 
-- Credits are awarded only when a submission is approved, never on upload. Pending items still appear in the app, labelled unverified, but pay nothing and do not count toward confirmations or reputation.
-- Base award: 10 credits per approved item photo, 20 for a meal deal sign.
-- Freshness bonus: double credits if the shop's previous record for that item is older than the 14-day limit.
-- Coverage bonus: +10 for the first photo of a shop or category that has no current data.
-- Confirmation: a new photo that confirms an existing price earns 5 credits and raises that record's confidence.
-- Cap of 100 credits per user per day.
-- A later correction that proves a record wrong reverses its credits.
+**Stale (not ranked)**
+Items last seen more than 14 days ago are excluded from ranking but shown greyed at the bottom.
 
-**Keeping the data honest**
+The optimiser function signature:
 
-- Reject duplicate or recycled photos by image hash.
-- A Claude vision check must find a readable price label or sign, or no credits are paid.
-- Items flagged `needs_review` earn nothing until a human approves them. Spot-check a sample of approved items against a second photo.
-- Reputation multiplier from 1.0 to 1.5 for users whose photos are later confirmed; reduced earning for users whose photos are repeatedly rejected.
-- Strip location metadata from every uploaded photo.
-
-**Rewards**
-
-- Sponsors supply a reward (a voucher code or a free item); we never handle cash. Examples to pitch: a free coffee, money off a lunch, a society ticket discount. These are placeholders, not agreed partnerships.
-- Redemption spends credits for a single-use code from a sponsor-supplied pool, recorded in the ledger.
-- Sponsors never influence ranking. Results come only from the optimiser, and any sponsored placement would have to be labelled.
-- For the hackathon, build a mocked rewards page with placeholder sponsors and say so in the demo. Real sponsors come after.
-
-**Records**
-
-```json
-// credit_event (append-only ledger; balance = sum of credits per user)
-{
-  "event_id": "string",
-  "user_id": "string",
-  "type": "earn | spend | reversal",
-  "credits": "number (positive earn, negative spend or reversal)",
-  "reason": "approved_item | approved_deal | stale_bonus | coverage_bonus | confirmation | reward_redeemed | reversal",
-  "ref_id": "item_id or reward_id",
-  "created_at": "datetime"
-}
-
-// reward
-{
-  "reward_id": "string",
-  "sponsor": "string",
-  "title": "string",
-  "cost_credits": "number",
-  "codes_remaining": "number",
-  "expires": "date or null"
-}
-
-// user (minimal)
-{
-  "user_id": "string",
-  "handle": "string",
-  "reputation": "number"
-}
+```python
+def get_results(
+    shops, items, deals, prefs
+) -> tuple[Lunch | None, list[Lunch], list[Lunch]]:
+    """
+    Returns:
+      primary       — single best Lunch, or None if no results
+      alternatives  — up to 3 more Lunches at primary.shop (vary main)
+      other_shops   — best Lunch from the next 3 ranked shops
+    """
 ```
 
-No real names or emails in the MVP: sign in with a handle, and show a redeemed code in the app.
-
-**Who builds it.** #2 builds the ledger and earning rules (one SQLite table and a few functions). #1 connects the approval event to the award. The beginner builds the balance display and the mocked rewards page.
-
-**Open points to check before real sponsors.** Whether UCL or the Students' Union has rules on commercial promotion on campus, and whether rewards raise any tax or promotion-rules issue. I haven't checked either, and I'm not a lawyer.
+---
 
 ## Data schema
 
-Three record types, frozen at kickoff. A change needs all three of us to agree.
+Four record types, frozen at kickoff. A change needs all three of us to agree.
 
 ```json
-// shop
+// shop  (lat/lng added for map view)
 {
   "shop_id": "tesco-tcr",
   "chain": "tesco | sainsburys | waitrose | marks-and-spencer | lidl | pret",
   "name": "string",
   "address": "string",
   "walking_minutes": "number, measured by hand from the agreed campus origin",
-  "last_verified": "date"
+  "last_verified": "date",
+  "lat": "number (WGS84)",
+  "lng": "number (WGS84)"
 }
 
 // deal (a bundle price over items)
 {
+  "deal_id": "string",
   "shop_id": "string",
   "name": "Meal Deal | Premium Meal Deal",
   "price_gbp": "number",
@@ -215,124 +190,203 @@ Three record types, frozen at kickoff. A change needs all three of us to agree.
   "confidence": "high | medium | low",
   "needs_review": "true if any field was ambiguous"
 }
+
+// user (minimal)
+{
+  "user_id": "string",
+  "handle": "string",
+  "reputation": "number"
+}
 ```
 
 - Diet flags and allergens come only from printed label text. Anything unreadable is `null`, never inferred.
 - An item with `null` allergen data is excluded from any search where the user lists an allergen.
 - `temperature` is `hot` only if the item was seen sold hot.
-- `quality_rating` comes from students, never from Claude. `premium_range` is read from the label or range name.
+- `quality_rating` comes from students, never from Claude.
 - Every price carries `last_seen` and the photo it came from.
 
-Pending records are shown in the app, labelled unverified; rejected ones never are. A search with a diet or allergen need uses only records with `status: approved` only. Credits are paid to the user in `submitted_by` when a record moves from `pending` to `approved`.
+---
+
+## Preferences (sidebar controls → Preferences model)
+
+The UI collects preferences through sidebar controls. These map to the `Preferences` model:
+
+| Sidebar control | Field | Default |
+|----------------|-------|---------|
+| Max price slider (£2–£14) | `max_price_gbp` | None (no cap) |
+| Walking limit slider (2–30 min) | `max_walking_minutes` | 10 |
+| Hot / Cold / Any segmented control | `temperature_pref` | "any" |
+| Diet chips (Vegetarian, Vegan, Halal) | `diet_flags` | [] |
+| Allergen chips (Gluten, Milk, Egg, Nuts, Sesame, Soy, Fish, Shellfish) | `allergens_exclude` | [] |
+| Loyalty toggle (Clubcard + Nectar) | `has_clubcard`, `has_nectar` | False |
+| Sort dropdown (Quality / Distance / Price) | `sort` | "quality" |
+
+**Sort → score weight mapping:**
+
+| Sort option | Effect |
+|------------|--------|
+| Quality | `quality_weight=5`, others=1 |
+| Distance | rank by `walking_minutes` ascending after score |
+| Price | `price_weight=5`, others=1 |
+
+---
 
 ## Optimiser and ranking logic
 
-Hard filters remove anything unsafe or out of range, a weighted score ranks the rest, and because the score is additive the best lunch per shop is found exactly, without searching combinations.
+Hard filters remove anything unsafe or out of range. A weighted score ranks the rest. Because the score is additive, the best lunch per shop is found exactly without searching combinations.
 
-**Hard filters (an item or shop must pass all)**
+**Hard filters (all must pass)**
 
-- Is approved (or pending, when the user has no diet or allergen need) and carries every diet flag the user requires (for example vegetarian).
-- Lists none of the allergens the user excludes. Items with `null` allergen data are excluded when any allergen is listed.
-- `last_seen` is within 14 days (a starting default, adjustable).
-- The shop is within the walking limit (starting default 10 minutes, adjustable).
-- Total price is within the user's cap, if they set one.
+- Status is approved (or pending when the user has no diet or allergen need).
+- Carries every diet flag the user requires.
+- Lists none of the allergens the user excludes. Items with `null` allergen data are excluded when any allergen is set.
+- `last_seen` is within 14 days.
+- The shop is within the walking limit.
+- Total price is within the user's cap, if set.
+- If hot/cold/any is set to "hot" or "cold", the main must match.
 
-**Score for a candidate lunch**
+**Score formula**
 
-```latex
-U = w_p \left(1 - \frac{P}{P_{max}}\right) + w_q\, Q + w_h\, H
+```
+U = w_p * (1 - P / P_max) + w_q * Q + w_h * H
 ```
 
-- P = the lunch price: the deal price if bundled, otherwise the sum of the three item prices, using loyalty prices if the user has that card. The price term is clamped at 0.
-- P\_max = the user's price cap if set, otherwise a fixed ceiling (start at £10).
-- Q = the mean of (q - 1) / 4 over the three items, where q is the student rating. An unrated item counts as 0.5, and a premium-range item adds 0.1 (capped at 1). These are starting values to tune on the seed data.
-- H = 1 if the main is hot, otherwise 0.
-- The user's three sliders (price, quality, warmth, 0 to 5) are normalised so the weights sum to 1; if all are 0, the weights are equal.
+- P = lunch price (deal or sum of items, using loyalty prices if applicable). Clamped at 0.
+- P_max = user's price cap or £10 default ceiling.
+- Q = mean quality score: (q−1)/4 per item; unrated = 0.5; premium range +0.1 (capped at 1).
+- H = 1 if main is hot, else 0.
+- Weights from sort selection (see table above), normalised to sum to 1.
 
 **Exact search per shop**
 
-P is a sum, Q is a mean and H depends only on the main, so U is additive across the three items. For each shop and each pricing mode, the best lunch is the best main, best snack and best drink chosen independently.
+1. **Separate mode:** pick best main, snack, drink independently by score contribution.
+2. **Deal mode:** use only `meal_deal_eligible` items at the fixed deal price; pick by quality and warmth.
+3. Return the higher-scoring mode. Rank shops by U, break ties by walking minutes.
 
-1. **Separate mode:** score each remaining item by its contribution to U and take the best in each category.
-2. **Deal mode:** use only `meal_deal_eligible` items. The price is fixed at the deal price, so pick by quality and warmth.
-3. Keep the higher of the two modes per shop, then rank shops by U, breaking ties by walking minutes.
+**Three-section output**
 
-**Where Claude fits.** Claude turns free text into sliders and filters, reads label photos, and writes the one-line "why" using only fields from the result. Claude never decides allergen or diet status; that comes from label text alone.
+After ranking:
+1. `primary` = top-ranked shop's best lunch.
+2. `alternatives` = up to 3 more baskets at `primary.shop`, varying the main (2nd, 3rd, 4th best mains, each paired with the same best snack and drink).
+3. `other_shops` = best lunch from the 2nd, 3rd and 4th ranked shops.
+
+**Where Claude fits**
+- Reads label photos → structured JSON (never decides allergen or diet status).
+- Writes the one-line "why" using only fields from the result.
+- Free-text preference parsing is a stretch feature only (not in the primary UI).
+
+---
+
+## Credits and sponsor rewards
+
+Students earn credits for approved photos and spend them on sponsor rewards.
+
+**Earning rules**
+
+- Credits awarded only on approval, never on upload.
+- Base: 10 credits per approved item photo, 20 for a meal deal sign.
+- Freshness bonus: 2× credits if the previous record for that item is older than 14 days.
+- Coverage bonus: +10 for the first photo of a shop/category with no current data.
+- Confirmation: +5 credits if a new photo confirms an existing price.
+- Cap: 100 credits per user per day.
+- Correction reverses credits if a record is later proven wrong.
+
+**Keeping data honest**
+
+- Reject duplicate photos by image hash.
+- Claude must find a readable price label or no credits are paid.
+- Items flagged `needs_review` earn nothing until a human approves them.
+- Strip EXIF location data from every uploaded photo.
+- Reputation multiplier 1.0–1.5 for consistently good submitters.
+
+**Rewards (mocked for hackathon)**
+
+- Sponsors supply voucher codes; we never handle cash.
+- For the hackathon, use placeholder sponsors and say so in the demo.
+- Redemption spends credits for a single-use code from a sponsor pool.
+- Sponsors never influence ranking.
+
+---
 
 ## Before the hackathon
 
-Build and test the pieces separately now, so the hackathon itself is integration.
-
 **Everyone**
-
-- [ ] Freeze the schema above.
-- [ ] Shared repo, API key in `.env`, `.env` in `.gitignore` (never commit a key).
-- [ ] Agree one campus origin point (for example the Main Quad on Gower Street) and measure walking minutes to each shop once, by hand, from a maps app. Record the date.
-- [ ] Seed walk, one lunch break, split between us: photograph about 15 shelf labels per shop (mains, snacks, drinks), the meal deal sign, and any hot item. Note shop, address and date. Keep the photos in `/seed`.
+- [x] Freeze the schema.
+- [x] Shared repo, API key in `.env`, `.env` in `.gitignore`.
+- [ ] Agree campus origin point (Main Quad, Gower Street suggested). Measure walking minutes to each shop by hand. Record the date.
+- [ ] Seed walk: ~15 shelf labels per shop (mains, snacks, drinks), meal deal sign, any hot item. Note shop, address, date. Keep photos in `/seed`.
 
 **Intermediate #1: extraction**
-
-- [ ] `extract_item.py`: photo + shop + date to item JSON, validated with Pydantic, one retry on a parse failure.
-- [ ] Deal-sign mode: photo to deal JSON.
-- [ ] Run every walk photo through it, compare each field with the label by eye, log errors and tighten the prompt.
-- [ ] Diet flags and allergens only from visible label text; `null` otherwise.
+- [x] `extract.py`: photo + shop + date → item JSON, validated with Pydantic, one retry on parse failure.
+- [x] Deal-sign mode: photo → deal JSON.
+- [ ] Run every walk photo through it; compare fields with label by eye; tighten the prompt.
+- [x] Diet flags and allergens only from visible label text; `null` otherwise.
 
 **Intermediate #2: optimiser**
-
-- [ ] Hard filters, score and per-shop search, with unit tests on 3 invented shops, including one where the deal wins and one where buying separately wins.
-- [ ] Prompt that turns free text into filters and sliders as JSON; test it on 10 phrasings.
+- [x] Hard filters, score and per-shop search, with unit tests on 3 invented shops.
+- [x] Tests: one shop where deal wins, one where separate wins, one allergen exclusion.
+- [ ] `get_results()` returning (primary, alternatives, other_shops) tuple.
 - [ ] "Why" prompt that may only use fields from the result.
 
-**Beginner: UI, data, demo**
+**Beginner: UI, seed data, demo**
+- [ ] Streamlit sidebar: allergen chips, diet chips, sliders, hot/cold/any, loyalty toggle, sort dropdown.
+- [ ] Three-section results layout: Section A featured card, Section B alternatives, Section C other shops.
+- [ ] Map view tab using `streamlit-folium`.
+- [ ] Shop table with name, address, walking minutes and coordinates.
+- [ ] First draft of demo script.
 
-- [ ] Streamlit skeleton: text box, sliders, diet checkboxes, loyalty-card toggle, result cards with photo thumbnail and last-seen date, upload box.
-- [ ] Shop table with name, address and walking minutes.
-- [ ] First draft of the demo script.
+---
 
 ## Hackathon day
 
-The plan assumes a 4-hour slot. Scale the timings if yours differs; the gate at 1:30 matters more than the exact minutes.
+Four-hour slot. The 1:30 gate matters more than the exact timings.
 
-1. **0:00 to 0:20, integrate.** Load the seed shops and items into SQLite and run the optimiser on them from a terminal.
-2. **0:20 to 1:30, build end to end.** #1 finishes batch extraction and the review screen. #2 wires the optimiser and free-text parser to the UI inputs. The beginner builds result cards and the upload box.
-3. **1:30, gate.** Type a preference, get a ranked list with correct prices from the seed data, even if ugly. If not, drop every stretch item and fix this first.
-4. **1:30 to 2:45, polish and "why".** Add the one-line "why", the deal-versus-separate comparison, and a sensible empty state (nothing matches, so show the closest and say which filter was relaxed). Add the credit ledger and a mocked rewards page.
-5. **2:45 to 3:30, rehearse.** Run the demo twice with a timer, record a backup capture, and check five prices shown in the demo against their photos.
-6. **3:30 to 4:00, buffer and submit.** Nothing new is built in this window.
+1. **0:00–0:20, integrate.** Load seed data into SQLite. Run optimiser from CLI to confirm results.
+2. **0:20–1:30, build end to end.** #1 finishes batch extraction and review screen. #2 wires `get_results()` to UI. Beginner builds three-section cards and map tab.
+3. **1:30, gate.** Set sidebar preferences → three-section results with correct seed prices. Ugly is fine; if not passing, drop all stretch items and fix.
+4. **1:30–2:45, polish.** Add "why" lines, map view, stale-items greyed section, empty/no-results states, credit ledger, mocked rewards page.
+5. **2:45–3:30, rehearse.** Demo twice with a timer. Check five prices against their photos.
+6. **3:30–4:00, buffer.** Nothing new is built.
+
+---
 
 ## Demo script
 
-About 3 to 4 minutes. Rehearse it twice with a timer.
+About 3–4 minutes. Rehearse twice with a timer.
 
-1. **Problem (20 s).** Lunch deals differ by shop, loyalty card and diet, and nobody compares them.
-2. **Capture (30 s).** Upload a shelf-label photo and show the extracted record beside the photo it came from, with its date, then the credits it earns once approved.
-3. **Preferences (30 s).** Type "cheap, warm, vegetarian, no nuts" and show the sliders and hard filters Claude produced, which the user can edit.
-4. **Results (60 s).** Show ranked shops with the exact lunch, price, walking minutes, last-seen date and the "why" line. Show one item excluded because its allergen data was missing, to make the safety rule visible.
-5. **Deal or separate (30 s).** Show a shop where the meal deal wins and one where buying items separately wins.
-6. **Close (30 s).** What Claude does (reads labels, parses preferences, explains), the physics edge (an exact additive optimiser, not a heuristic), and what's next (more shops, real sponsors).
+1. **Problem (20 s).** Lunch deals differ by shop, loyalty card and diet. Nobody compares them.
+2. **Capture (30 s).** Upload a shelf-label photo. Show the extracted record beside the photo, with its date, and the credits it will earn once approved.
+3. **Preferences (30 s).** Set the sidebar: walk limit 5 min, vegetarian, no nuts. Show how the results change instantly.
+4. **Results (60 s).** Show the three-section layout: featured best option at the top, two alternatives at the same shop, three other nearby shops. Point out the "why" line and the freshness date. Show one item excluded because its allergen data was missing.
+5. **Deal or separate (30 s).** Show a shop where the meal deal wins and one where buying separately wins.
+6. **Map (20 s).** Switch to the map tab — same results, pins coloured by rank, walking-limit circle.
+7. **Close (20 s).** What Claude does (reads labels, explains), the exact optimiser (not a heuristic), what's next (more shops, real sponsors).
 
-**Backup:** keep the seed database and cached "why" lines so the demo runs without the API, plus the recorded capture.
+**Backup:** keep the seed database and cached "why" lines so the demo runs without the API. Record a capture before the event.
+
+---
 
 ## Risks, fallbacks and compliance
 
 | Risk | Fallback |
 | --- | --- |
-| Stale or wrong prices | `last_seen` on every price, old prices filtered out, source photo shown beside the result. |
-| Wrong allergen or diet data | Flags only from printed label text; `null` means excluded from restricted searches; a permanent "check the label" notice; no medical advice. |
-| Too few submissions by demo day | The seed walk covers about 15 items per shop. Nothing depends on live submissions. |
-| Claude misreads a label | `needs_review` flag and a side-by-side review screen; every walk photo is compared with its record by eye. |
-| M&S, Lidl or Pret have no meal deal | Separate mode prices them item by item, so they still rank. |
-| Deal prices differ by shop or card | Deals are stored per shop, with a loyalty-card toggle; verify on the shelf during the walk. |
-| Hot food is not always available | `hot` only if seen sold hot; the result shows when it was last seen. |
+| Stale or wrong prices | `last_seen` on every price, old prices filtered out, source photo shown. |
+| Wrong allergen or diet data | Flags only from printed label text; `null` means excluded; permanent "check the label" notice. |
+| Too few submissions by demo day | Seed walk covers ~15 items per shop. Nothing depends on live uploads. |
+| Claude misreads a label | `needs_review` flag; side-by-side review screen; every walk photo compared by eye. |
+| M&S, Lidl or Pret have no meal deal | Separate mode prices them item by item; they still rank. |
+| Hot food not always available | `hot` only if seen sold hot; result shows when last seen. |
 | API outage or venue Wi-Fi | Local database, cached "why" lines, recorded capture. |
-| Junk or spam submissions | Everything lands in the review queue; a photo is required. |
-| Scope creep | The stretch list stays frozen until the 1:30 gate passes. |
+| Junk uploads | Everything lands in the review queue; a photo is required. |
+| Scope creep | Stretch list stays frozen until the 1:30 gate passes. |
 
-**Compliance.** The MVP uses photos taken in store by people, not scraping. Scraping chain websites is out of the MVP. If you add it later, that's the team's call; run it once ahead of time at a low request rate, store a dated snapshot, and never scrape live during the demo. Keep people's faces out of photos.
+**Compliance.** The MVP uses in-store photos only, no scraping. Keep faces out of photos.
+
+---
 
 ## Sources
 
-Price and store facts, as reported on 2026-10-12. Re-check every figure on the shelf.
+Price and store facts as reported on 2026-10-12. Re-check every figure on the shelf.
 
 - [Grocery Gazette: Tesco festive meal deal range](https://www.grocerygazette.co.uk/2026/10/06/tesco-launches-festive-meal-deal-range/)
 - [Retail Gazette: Tesco meal deal price rise](https://www.retailgazette.co.uk/?p=191928)
