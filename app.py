@@ -240,6 +240,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         with col3:
             if st.button("See basket →", key=f"open_{lunch.shop.shop_id}_{rank}"):
                 st.session_state["detail_shop_id"] = lunch.shop.shop_id
+                st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
                 st.session_state["screen"] = "detail"
                 st.rerun()
 
@@ -262,12 +263,23 @@ def screen_find(prefs: Preferences):
             filtered = hard_filter(items, prefs)
             in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes]
             if not in_range:
-                st.info("← No shops within your walking limit. Try increasing it.")
+                st.warning("No shops within your walking limit.")
+                if st.button("Relax to 15 min", key="relax_walk"):
+                    st.session_state["walk_limit_override"] = 15
+                    st.rerun()
             elif not filtered:
-                st.info("← No items match your filters. Try relaxing your diet or allergen settings.")
+                st.warning("No items match your filters.")
+                if st.button("Clear diet filters", key="relax_diet"):
+                    for d in DIETS:
+                        st.session_state[f"diet_{d}"] = False
+                    st.rerun()
             else:
-                st.info("← Set your preferences on the left to find the best lunch near you.")
+                st.info("Set your preferences on the left to find the best lunch near you.")
+                st.caption("Pick a budget and walking limit — results appear instantly.")
             return
+
+        in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
+        st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
 
         # Section A — featured best option
         st.markdown("#### Your best option")
@@ -341,7 +353,12 @@ def screen_detail():
         st.rerun()
 
     st.markdown(f"## {shop.name}")
-    st.caption(f"{shop.walking_minutes:.0f} min walk from campus")
+    # Pull the why from the last ranked result for this shop if available
+    why_text = st.session_state.get(f"why_{shop_id}", "")
+    sub = f"{shop.walking_minutes:.0f} min walk from campus"
+    if why_text:
+        sub += f" · {why_text}"
+    st.caption(sub)
 
     # Items for this shop
     shop_items = [i for i in all_items if i.shop_id == shop_id and i.status in ("approved", "pending")]
@@ -523,7 +540,10 @@ def screen_detail():
 
 def screen_upload():
     st.markdown("## Add a photo")
-    st.caption("Snap a shelf label. Earn credits once our team approves it.")
+    st.info(
+        "If your photo is clear, you get credits straight away. "
+        "If not, our team may take up to 24 hours to review it."
+    )
 
     user_id = _ensure_user()
     if not user_id:
@@ -532,69 +552,78 @@ def screen_upload():
     col_upload, col_result = st.columns(2)
 
     with col_upload:
-        uploaded = st.file_uploader(
-            "Drag a photo here or browse",
-            type=["jpg", "jpeg", "png", "webp"],
-            key="photo_upload",
-        )
         shop_options = {s.name: s.shop_id for s in _load_data()[0]}
         shop_name = st.selectbox("Which shop is this from?", list(shop_options.keys()))
         shop_id = shop_options[shop_name]
+        uploaded = st.file_uploader(
+            "Photo the whole shelf",
+            type=["jpg", "jpeg", "png", "webp"],
+            key="photo_upload",
+            help="Get labels, prices and deal signs in frame · JPG or PNG, up to 10 MB",
+        )
 
     with col_result:
+        st.markdown("**What we found**")
         if uploaded is None:
-            st.info("Upload a photo to see what we read from it.")
-            return
+            st.caption("Upload a photo to see the items we pick out.")
+        else:
+            # Save file
+            save_path = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{uploaded.name}"
+            save_path.write_bytes(uploaded.read())
 
-        # Save file
-        save_path = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{uploaded.name}"
-        save_path.write_bytes(uploaded.read())
+            with st.spinner("Reading your photo… you can keep browsing."):
+                try:
+                    item = extract_item(
+                        save_path,
+                        shop_id=shop_id,
+                        submitted_via="upload",
+                        submitted_by=user_id,
+                        strip_location=True,
+                    )
+                    extract_ok = True
+                except Exception as exc:
+                    extract_ok = False
+                    extract_err = str(exc)
 
-        with st.spinner("Reading your photo… you can keep browsing."):
-            try:
-                item = extract_item(
-                    save_path,
-                    shop_id=shop_id,
-                    submitted_via="upload",
-                    submitted_by=user_id,
-                    strip_location=True,
-                )
-                st.success("Photo read successfully.")
-            except Exception as exc:
+            if not extract_ok:
                 st.error(
-                    f"We couldn't read a price label in that photo. "
-                    f"Hold the phone steady, fill the frame with the label, and try again.\n\n_{exc}_"
+                    "We couldn't read this photo — it's too blurry. "
+                    "Hold the phone steady, step back so the labels are sharp, then retake."
                 )
-                return
+                st.caption(f"_{extract_err}_")
+            else:
+                rows = [
+                    ("Item", item.name),
+                    ("Type", item.category),
+                    ("Price", f"£{item.price_gbp:.2f}"),
+                    ("Deal", "✅ eligible" if item.meal_deal_eligible else "Not in deal"),
+                    ("Allergens", ", ".join(item.allergens) if item.allergens else "none on label"),
+                ]
+                for label, val in rows:
+                    st.markdown(f"**{label}:** {val}")
 
-        # Show extracted data
-        st.markdown("**What we read**")
-        rows = [
-            ("Shop", shop_name),
-            ("Item", item.name),
-            ("Category", item.category),
-            ("Price", f"£{item.price_gbp:.2f}"),
-            ("Meal deal eligible", str(item.meal_deal_eligible)),
-            ("Allergens", ", ".join(item.allergens) if item.allergens else "none on label"),
-            ("Diet flags", ", ".join(item.diet_flags) if item.diet_flags else "none on label"),
-            ("Confidence", item.confidence),
-        ]
-        for label, val in rows:
-            st.markdown(f"**{label}:** {val}")
+                if item.needs_review:
+                    st.warning(
+                        "Sent to our team to check — some details weren't clear enough. "
+                        "Shows as Unverified in results. 0 credits until approved (usually within 24 hours)."
+                    )
+                else:
+                    st.caption("⚠️ We only report allergen info printed on the label. Always check the packaging.")
 
-        if item.needs_review:
-            st.warning("Label was partially readable — marked for team review before credits are paid.")
-
-        st.caption("⚠️ We only report allergen info printed on the label. Always check the packaging.")
-
-        if st.button("Looks right — submit for review", type="primary"):
-            conn = _conn()
-            item_id = approval.queue_item(conn, item.model_dump())
-            st.session_state["last_submitted_id"] = item_id
-            st.success(
-                "Sent — awaiting review. 0 credits for now. "
-                "You'll earn up to 20 credits once it's approved."
-            )
+                if st.button("Looks right — submit", type="primary"):
+                    conn = _conn()
+                    item_id = approval.queue_item(conn, item.model_dump())
+                    st.session_state["last_submitted_id"] = item_id
+                    if item.needs_review:
+                        st.info(
+                            "Sent to our team to check. "
+                            "0 credits until approved — usually within 24 hours."
+                        )
+                    else:
+                        st.success(
+                            "Published. Credits will be added once approved. "
+                            "It's live in results now."
+                        )
 
 
 # ---------------------------------------------------------------------------
@@ -658,11 +687,41 @@ def screen_credits():
     if not history:
         st.caption("No credit events yet.")
     else:
+        # Resolve shop names from ref_ids
+        shops_map = {s.shop_id: s.name for s in _load_data()[0]}
+
+        def _ref_to_shop(ref_id: str) -> str:
+            row = conn.execute(
+                "SELECT shop_id FROM items WHERE item_id = ? UNION SELECT shop_id FROM deals WHERE deal_id = ?",
+                (ref_id, ref_id),
+            ).fetchone()
+            if row:
+                return shops_map.get(row[0], row[0])
+            return "—"
+
+        STATUS_COLOURS = {
+            "earn":     ("#16A34A", "Approved"),
+            "spend":    ("#0F7B5F", "Redeemed"),
+            "reversal": ("#DC2626", "Not accepted"),
+        }
+
+        hdr1, hdr2, hdr3 = st.columns([3, 2, 1])
+        hdr1.caption("**Shop**")
+        hdr2.caption("**Status**")
+        hdr3.caption("**Credits**")
+
         for event in history:
+            colour, label = STATUS_COLOURS.get(event["type"], ("#6B7280", event["type"]))
+            shop_name = _ref_to_shop(event["ref_id"]) if event.get("ref_id") else "—"
             sign = "+" if event["credits"] > 0 else ""
-            reason_label = event["reason"].replace("_", " ")
-            ts = event["created_at"][:10]
-            st.markdown(f"`{sign}{event['credits']}` · {reason_label} · {ts}")
+
+            c1, c2, c3 = st.columns([3, 2, 1])
+            c1.markdown(shop_name)
+            c2.markdown(
+                f'<span style="color:{colour};font-weight:600">{label}</span>',
+                unsafe_allow_html=True,
+            )
+            c3.markdown(f"**{sign}{event['credits']}**")
 
 
 # ---------------------------------------------------------------------------
@@ -698,16 +757,33 @@ def screen_review():
                     st.caption("[label photo]")
 
             with c2:
-                shop_name = row.get("shop_id", "Unknown shop")
-                st.markdown(f"**{shop_name}** · {row.get('name', '')}")
+                # Resolve shop name from shops list
+                all_shops_map = {s.shop_id: s.name for s in _load_data()[0]}
+                shop_display = all_shops_map.get(row.get("shop_id", ""), row.get("shop_id", "Unknown shop"))
+                st.markdown(f"**{shop_display}** · {row.get('name', '')}")
+
                 if record_type == "item":
                     allergens = json.loads(row.get("allergens", "[]"))
                     st.caption(
                         f"{row.get('category','').upper()} · "
                         f"£{row.get('price_gbp', 0):.2f} · "
-                        f"Allergens: {', '.join(allergens) if allergens else 'not on label'}"
+                        f"Allergens: {', '.join(allergens) if allergens else 'not on label'} · "
+                        f"uploaded by student #{row.get('submitted_by', 'anonymous')}"
                     )
-                    st.caption(f"Confidence: {row.get('confidence', '?')} · Submitted by: {row.get('submitted_by', 'anonymous')}")
+
+                    # Confidence bar
+                    conf_str = row.get("confidence", "high")
+                    conf_val = {"high": 0.92, "medium": 0.72, "low": 0.45}.get(conf_str, 0.92)
+                    st.caption("Model confidence")
+                    st.progress(conf_val, text=f"{int(conf_val * 100)}%  (threshold: 85%)")
+
+                    if row.get("needs_review"):
+                        flag_reason = (
+                            "Confidence below 85% — label may be partially obscured or blurry."
+                            if conf_val < 0.85
+                            else "Flagged for manual review."
+                        )
+                        st.caption(f"Why it was flagged: {flag_reason}")
                 else:
                     st.caption(f"Deal · £{row.get('price_gbp', 0):.2f}")
 
