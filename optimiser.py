@@ -95,8 +95,9 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
             if item.status == "rejected":
                 continue
 
-        # 2. Diet flags
-        if prefs.diet_flags:
+        # 2. Diet flags — only applied to mains; snacks/drinks are assumed fine
+        # (crisps, water, juice etc. often aren't explicitly labelled vegetarian/vegan)
+        if prefs.diet_flags and item.category == "main":
             item_flags_lower = [f.lower() for f in item.diet_flags]
             if not all(req.lower() in item_flags_lower for req in prefs.diet_flags):
                 continue
