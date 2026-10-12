@@ -163,8 +163,8 @@ class TestHardFilter:
 
 class TestRankShops:
     def test_cheapest_first_price_weight_wins(self):
-        """With price weight = 5, quality = 0, warmth = 0 → shop-a (deal £4.25) ranks first."""
-        prefs = Preferences(price_weight=5, quality_weight=0, warmth_weight=0)
+        """With sort='price' → shop-a (deal £4.25) ranks first."""
+        prefs = Preferences(sort="price")
         ranked = rank_shops(ALL_SHOPS, ALL_ITEMS, ALL_DEALS, prefs, today=TODAY)
         assert len(ranked) >= 1
         assert ranked[0].shop.shop_id == "shop-a"
@@ -172,8 +172,8 @@ class TestRankShops:
         assert ranked[0].price_gbp == 4.25
 
     def test_warmest_first_warmth_weight_wins(self):
-        """With warmth weight = 5, price = 0, quality = 0 → shop-c (hot main) ranks first."""
-        prefs = Preferences(price_weight=0, quality_weight=0, warmth_weight=5)
+        """With temperature_pref='hot' → shop-c (hot main) ranks first."""
+        prefs = Preferences(temperature_pref="hot")
         ranked = rank_shops(ALL_SHOPS, ALL_ITEMS, ALL_DEALS, prefs, today=TODAY)
         assert len(ranked) >= 1
         assert ranked[0].shop.shop_id == "shop-c"
@@ -200,7 +200,7 @@ class TestRankShops:
 
     def test_deal_beats_separate_when_cheaper(self):
         """Shop-a deal (£4.25) beats separate (£6.00) — used_deal should be True."""
-        prefs = Preferences(price_weight=5, quality_weight=0, warmth_weight=0)
+        prefs = Preferences(sort="price")
         ranked = rank_shops(ALL_SHOPS, ALL_ITEMS, ALL_DEALS, prefs, today=TODAY)
         shop_a_lunch = next(l for l in ranked if l.shop.shop_id == "shop-a")
         assert shop_a_lunch.used_deal is True
@@ -208,7 +208,7 @@ class TestRankShops:
     def test_separate_beats_deal_when_deal_is_expensive(self):
         """If deal price > sum of items, separate mode should win."""
         expensive_deal = _deal("deal-a2", "shop-a", 10.00)  # deal = £10, separate = £6
-        prefs = Preferences(price_weight=5, quality_weight=0, warmth_weight=0)
+        prefs = Preferences(sort="price")
         lunch = best_lunch_for_shop(SHOP_A, ITEMS_A, [expensive_deal], prefs)
         assert lunch is not None
         assert lunch.used_deal is False

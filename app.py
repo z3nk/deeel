@@ -194,15 +194,8 @@ def _allergen_line(items_list, avoid: list[str]) -> str:
 
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False):
     from models import Lunch
-    border = "2px solid #0F7B5F" if featured else "1px solid #E3E3DE"
-    bg = "#F0FDF4" if featured else "#FFFFFF"
 
-    with st.container(border=False):
-        st.markdown(
-            f'<div style="border:{border};border-radius:8px;background:{bg};padding:16px;margin-bottom:12px">',
-            unsafe_allow_html=True,
-        )
-
+    with st.container(border=True):
         col1, col2, col3 = st.columns([3, 2, 1])
         with col1:
             rank_str = f"#{rank} " if rank > 0 else ""
@@ -249,8 +242,6 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
                 st.session_state["screen"] = "detail"
                 st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -464,34 +455,24 @@ def screen_detail():
 
     pc1, pc2 = st.columns(2)
     with pc1:
-        border = "2px solid #0F7B5F" if is_deal_better else "1px solid #E3E3DE"
-        st.markdown(
-            f'<div style="border:{border};border-radius:8px;padding:16px">',
-            unsafe_allow_html=True,
-        )
-        st.caption("Meal deal price")
-        if deal is None:
-            st.markdown("**No deal at this shop**")
-        elif not deal_eligible:
-            st.markdown(f"**£{deal.price_gbp:.2f}** — not available")
-            st.caption("An item you picked isn't in the meal deal.")
-        else:
-            st.markdown(f"**£{deal.price_gbp:.2f}**")
-            if is_deal_better:
-                st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.caption("Meal deal price")
+            if deal is None:
+                st.markdown("**No deal at this shop**")
+            elif not deal_eligible:
+                st.markdown(f"**£{deal.price_gbp:.2f}** — not available")
+                st.caption("An item you picked isn't in the meal deal.")
+            else:
+                st.markdown(f"**£{deal.price_gbp:.2f}**")
+                if is_deal_better:
+                    st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
 
     with pc2:
-        border = "2px solid #0F7B5F" if not is_deal_better else "1px solid #E3E3DE"
-        st.markdown(
-            f'<div style="border:{border};border-radius:8px;padding:16px">',
-            unsafe_allow_html=True,
-        )
-        st.caption("Bought separately")
-        st.markdown(f"**£{sep_price:.2f}**")
-        if not is_deal_better:
-            st.caption("✅ Best option")
-        st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.caption("Bought separately")
+            st.markdown(f"**£{sep_price:.2f}**")
+            if not is_deal_better:
+                st.caption("✅ Best option")
 
     st.divider()
 
