@@ -276,6 +276,28 @@ def _init_db(conn: sqlite3.Connection) -> None:
     _seed_rewards(conn)
     _seed_tasks(conn)
     conn.commit()
+    _auto_seed_items(conn)
+
+
+def _auto_seed_items(conn: sqlite3.Connection) -> None:
+    """
+    On first startup (no approved items in DB), load fallback seed data automatically.
+    This lets the app work out-of-the-box on Streamlit Community Cloud without a manual seed step.
+    """
+    row = conn.execute("SELECT 1 FROM items WHERE status = 'approved' LIMIT 1").fetchone()
+    if row is not None:
+        return  # already seeded
+
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    seed_script = Path(__file__).parent / "seed" / "load_seed.py"
+    if seed_script.exists():
+        subprocess.run(
+            [sys.executable, str(seed_script), "--fallback"],
+            check=False,
+        )
 
 
 def _seed_shops(conn: sqlite3.Connection) -> None:
