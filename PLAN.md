@@ -113,6 +113,8 @@ The single top-scoring lunch across all shops. Displayed as a featured card with
 **Section B — Alternatives at the same shop (up to 3)**
 The next 2–3 best baskets at the top-ranked shop, varying the main item (different mains paired with the same best snack and drink). Displayed as secondary cards below the featured card.
 
+Note: the Shop Detail screen also exposes all alternatives interactively (per-category dropdowns + full catalogue table with "Swap in" buttons). Section B on the Find screen is a quick preview; Shop Detail is the full exploration.
+
 **Section C — Other shops (up to 3)**
 The best lunch from the 2nd, 3rd and 4th ranked shops. Displayed as secondary cards under a divider.
 
@@ -204,6 +206,7 @@ Four record types, frozen at kickoff. A change needs all three of us to agree.
 - `temperature` is `hot` only if the item was seen sold hot.
 - `quality_rating` comes from students, never from Claude.
 - Every price carries `last_seen` and the photo it came from.
+- `meal_deal_eligible: false` ("not in deal") items are shown in the shop catalogue and can be swapped into a custom basket, but are excluded from deal-pricing mode. The UI labels them "not in deal".
 
 ---
 
@@ -217,7 +220,7 @@ The UI collects preferences through sidebar controls. These map to the `Preferen
 | Walking limit slider (2–30 min) | `max_walking_minutes` | 10 |
 | Hot / Cold / Any segmented control | `temperature_pref` | "any" |
 | Diet chips (Vegetarian, Vegan, Halal) | `diet_flags` | [] |
-| Allergen chips (Gluten, Milk, Egg, Nuts, Sesame, Soy, Fish, Shellfish) | `allergens_exclude` | [] |
+| Allergen chips (Gluten, Milk, Egg, Nuts, Sesame, Soy, Fish, Shellfish) | `allergens_exclude` | [] | Note: Figma prototype currently only has 6 — Fish and Shellfish still need adding. |
 | Loyalty toggle (Clubcard + Nectar) | `has_clubcard`, `has_nectar` | False |
 | Sort dropdown (Quality / Distance / Price) | `sort` | "quality" |
 

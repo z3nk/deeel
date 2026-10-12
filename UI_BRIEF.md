@@ -213,27 +213,66 @@ Design this first — it's used in Sections A, B and C (with different visual we
 
 ## Screen 2: Shop detail
 
-Full breakdown of one shop's basket. Reached by clicking "View full basket →".
+Full breakdown for one shop. Reached by clicking "View full basket →" on any result card.
+
+**Your basket (top section)**
+
+Three item cards side by side (Main · Snack · Drink). Each card has:
+- A dropdown to swap to any other available item in that category
+- Item name, price, label photo placeholder, freshness badge, allergen/diet line
+- "Best pick" badge on the pre-selected item
+- A "Reset to best basket" button that appears only after a swap
 
 ```
 ← Back to results
 
-Tesco Express · 4 min walk · 124–125 Tottenham Court Road
+Tesco Express · 4 min walk · Cheapest, and the wrap is hot
 
-  Meal deal  £3.85 with Clubcard (£4.25 without)   vs   Separate  £5.50
-  [Meal deal highlighted as best option]
+[Reset to best basket]  ← only shown after a swap
 
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-  │  [photo]     │  │  [photo]     │  │  [photo]     │
-  │  Chicken     │  │  Sea Salt    │  │  Coke Zero   │
-  │  Wrap        │  │  Crisps      │  │              │
-  │  £2.10 card  │  │  £0.85       │  │  £0.90       │
-  │  MAIN · hot  │  │  SNACK       │  │  DRINK       │
-  │  Seen 2d ago │  │  Seen 2d ago │  │  Seen 5d ago │
-  └──────────────┘  └──────────────┘  └──────────────┘
+┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐
+│ MAIN  [Best pick] │  │ SNACK             │  │ DRINK             │
+│ [dropdown ▾]      │  │ [dropdown ▾]      │  │ [dropdown ▾]      │
+│ Chicken wrap      │  │ Walkers crisps    │  │ Coca-Cola 500ml   │
+│ £2.75 · hot       │  │ £1.00             │  │ £1.20             │
+│ [label photo]     │  │ [label photo]     │  │ [label photo]     │
+│ Seen 2 days ago   │  │ Seen 2 days ago   │  │ Seen 2 days ago   │
+│ Allergens: gluten,│  │ Allergens: milk   │  │ Allergens: none   │
+│ milk              │  │                   │  │                   │
+└───────────────────┘  └───────────────────┘  └───────────────────┘
+```
 
-  Allergens (from label): gluten, milk, egg
-  Diet flags: none printed on label
+**Pricing comparison (below basket)**
+
+Two cards side by side — the better option gets the primary-colour border:
+- Meal deal price (or "not available" if a swapped item has `meal_deal_eligible: false`)
+- Bought separately total
+
+If the user swaps in an item not in the deal, show: *"An item you picked isn't in the meal deal"* under the deal card.
+
+**Full catalogue (below pricing)**
+
+A searchable table of every item seen at this shop with category filter tabs (All · Mains · Snacks · Drinks).
+
+Columns: thumbnail · item name (+ hot / not-in-deal / pending flags) · type · price · allergens · freshness · Swap in button
+
+- "Swap in" replaces that category in the basket
+- Items already in the basket show "In basket" label instead of the button
+- Items older than 14 days shown at 50% opacity
+- `meal_deal_eligible: false` items labelled "not in deal"
+
+```
+Everything we've seen here   [Search items     ]
+
+[All]  [Mains]  [Snacks]  [Drinks]
+
+┌──────────────────────────────────────────────────────────────────┐
+│ [img] Chicken wrap · hot    Main  £2.75  gluten,milk  2d  In basket  │
+│ [img] Ham & cheese sandwich Main  £2.50  gluten,milk  3d  [Swap in]  │
+│ [img] Veg sushi box · vegan Main  £3.25  soy,sesame   2d  [Swap in]  │
+│ [img] Steak bake · hot      Main  £1.90  gluten,milk  1d  [Swap in]  │
+│       not in deal                                                     │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
