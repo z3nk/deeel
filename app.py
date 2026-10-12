@@ -384,8 +384,15 @@ def screen_detail():
         pend = " · unverified" if item.status == "pending" else ""
         return f"{item.name} — £{item.price_gbp:.2f}{hot}{nd}{pend}"
 
-    col1, col2, col3 = st.columns(3)
     key_prefix = f"detail_{shop_id}"
+
+    # Apply any pending swaps from the catalogue table BEFORE widgets are instantiated
+    for cat in ("main", "snack", "drink"):
+        pending = f"{key_prefix}_{cat}_pending"
+        if pending in st.session_state:
+            st.session_state[f"{key_prefix}_{cat}"] = st.session_state.pop(pending)
+
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.caption("MAIN")
@@ -536,7 +543,7 @@ def screen_detail():
                 st.caption("In basket")
             elif idx is not None:
                 if st.button("Swap in", key=f"swap_{item.item_id}"):
-                    st.session_state[current_key] = idx
+                    st.session_state[f"{current_key}_pending"] = idx
                     st.rerun()
 
 
