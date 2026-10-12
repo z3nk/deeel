@@ -25,6 +25,9 @@ from db import (
     fetch_approved_deals,
     fetch_approved_items,
     fetch_all_shops,
+    fetch_all_tasks,
+    get_completed_task_ids,
+    complete_task,
     get_connection,
     get_user_credit_balance,
     upsert_user,
@@ -549,14 +552,44 @@ def screen_upload():
     if not user_id:
         st.warning("Enter your name in the sidebar to earn credits.")
 
+    conn = _conn()
+    shops_list = _load_data()[0]
+    shop_options = {s.name: s.shop_id for s in shops_list}
+    shops_by_id = {s.shop_id: s.name for s in shops_list}
+
+    # Active task from session state
+    active_task_id = st.session_state.get("active_task_id")
+    active_task = None
+    if active_task_id:
+        tasks_all = fetch_all_tasks(conn)
+        active_task = next((t for t in tasks_all if t["task_id"] == active_task_id), None)
+
+    # ── Upload + results ────────────────────────────────────────────────────
     col_upload, col_result = st.columns(2)
 
     with col_upload:
-        shop_options = {s.name: s.shop_id for s in _load_data()[0]}
-        shop_name = st.selectbox("Which shop is this from?", list(shop_options.keys()))
-        shop_id = shop_options[shop_name]
+        if active_task:
+            st.markdown(
+                f'<div style="border:2px solid #0F7B5F;border-radius:8px;padding:12px;margin-bottom:12px">'
+                f'<b>Task: {active_task["item_name"]}</b> at {shops_by_id.get(active_task["shop_id"], active_task["shop_id"])}<br>'
+                f'<span style="color:#6B7280;font-size:13px">{active_task["ask"]}</span></div>',
+                unsafe_allow_html=True,
+            )
+            # Lock shop to the task's shop
+            shop_id = active_task["shop_id"]
+            shop_name = shops_by_id.get(shop_id, shop_id)
+            st.caption(f"Shop locked to: **{shop_name}**")
+            if st.button("Cancel task", key="cancel_task"):
+                st.session_state.pop("active_task_id", None)
+                st.rerun()
+            uploader_label = f"Upload photo for: {active_task['item_name']}"
+        else:
+            shop_name = st.selectbox("Which shop is this from?", list(shop_options.keys()))
+            shop_id = shop_options[shop_name]
+            uploader_label = "Photo the whole shelf"
+
         uploaded = st.file_uploader(
-            "Photo the whole shelf",
+            uploader_label,
             type=["jpg", "jpeg", "png", "webp"],
             key="photo_upload",
             help="Get labels, prices and deal signs in frame · JPG or PNG, up to 10 MB",
@@ -567,7 +600,6 @@ def screen_upload():
         if uploaded is None:
             st.caption("Upload a photo to see the items we pick out.")
         else:
-            # Save file
             save_path = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{uploaded.name}"
             save_path.write_bytes(uploaded.read())
 
@@ -604,26 +636,74 @@ def screen_upload():
 
                 if item.needs_review:
                     st.warning(
-                        "Sent to our team to check — some details weren't clear enough. "
-                        "Shows as Unverified in results. 0 credits until approved (usually within 24 hours)."
+                        "Some details weren't clear enough — marked for team review. "
+                        "0 credits until approved (usually within 24 hours)."
                     )
                 else:
-                    st.caption("⚠️ We only report allergen info printed on the label. Always check the packaging.")
+                    st.caption("⚠️ Allergen info is from the label only. Always check the packaging.")
 
-                if st.button("Looks right — submit", type="primary"):
-                    conn = _conn()
+                submit_label = (
+                    f"Submit — complete task (+{active_task['bonus_credits']} bonus credits)"
+                    if active_task else "Looks right — submit"
+                )
+                if st.button(submit_label, type="primary"):
                     item_id = approval.queue_item(conn, item.model_dump())
                     st.session_state["last_submitted_id"] = item_id
+
+                    # Mark task complete in DB — this is what makes the tick persist
+                    if active_task and user_id:
+                        complete_task(conn, active_task["task_id"], user_id, item_id)
+                        st.session_state.pop("active_task_id", None)
+
                     if item.needs_review:
-                        st.info(
-                            "Sent to our team to check. "
-                            "0 credits until approved — usually within 24 hours."
-                        )
+                        st.info("Sent to our team to check. 0 credits until approved — usually within 24 hours.")
                     else:
-                        st.success(
-                            "Published. Credits will be added once approved. "
-                            "It's live in results now."
-                        )
+                        st.success("Published. Credits will be added once approved. It's live in results now.")
+                    st.rerun()
+
+    # ── Task cards ──────────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("#### Tasks")
+    st.caption("We need a closer photo of these products. Bonus credits for each.")
+
+    tasks = fetch_all_tasks(conn)
+    if not tasks:
+        st.caption("No tasks right now — check back later.")
+    else:
+        done_ids = get_completed_task_ids(conn, user_id) if user_id else set()
+        cols = st.columns(3)
+        for i, task in enumerate(tasks):
+            is_done = task["task_id"] in done_ids
+            is_active = task["task_id"] == st.session_state.get("active_task_id")
+            shop_display = shops_by_id.get(task["shop_id"], task["shop_id"])
+
+            border = "2px solid #0F7B5F" if is_active else "1px solid #E3E3DE"
+            bg = "#F0FDF4" if is_done else ("#F7F7F4" if is_active else "#FFFFFF")
+
+            with cols[i % 3]:
+                st.markdown(
+                    f'<div style="border:{border};border-radius:8px;background:{bg};padding:12px;margin-bottom:8px">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+                    f'<b>{task["item_name"]}</b>'
+                    f'<span style="background:#DCFCE7;color:#16A34A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">+{task["bonus_credits"]} credits</span>'
+                    f'</div>'
+                    f'<div style="color:#6B7280;font-size:12px">{shop_display}</div>'
+                    f'<div style="color:#6B7280;font-size:12px">Needed: {task["needed"]}</div>'
+                    f'<div style="color:#1F2328;font-size:12px;margin-top:4px">{task["ask"]}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                if is_done:
+                    st.markdown(
+                        '<span style="color:#16A34A;font-weight:700">Done ✓</span>',
+                        unsafe_allow_html=True,
+                    )
+                elif is_active:
+                    st.caption("Upload above ↑")
+                else:
+                    if st.button("Take photo", key=f"task_btn_{task['task_id']}"):
+                        st.session_state["active_task_id"] = task["task_id"]
+                        st.rerun()
 
 
 # ---------------------------------------------------------------------------

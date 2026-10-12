@@ -97,12 +97,32 @@ CREATE TABLE IF NOT EXISTS reward_redemptions (
     redeemed_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS tasks (
+    task_id       TEXT PRIMARY KEY,
+    shop_id       TEXT NOT NULL REFERENCES shops(shop_id),
+    item_name     TEXT NOT NULL,        -- what to photograph
+    needed        TEXT NOT NULL,        -- e.g. "price + allergens"
+    ask           TEXT NOT NULL,        -- instruction shown to the user
+    bonus_credits INTEGER NOT NULL DEFAULT 5
+);
+
+CREATE TABLE IF NOT EXISTS task_completions (
+    completion_id TEXT PRIMARY KEY,
+    task_id       TEXT NOT NULL REFERENCES tasks(task_id),
+    user_id       TEXT NOT NULL,
+    item_id       TEXT,                 -- item submitted for this task (nullable)
+    completed_at  TEXT NOT NULL,
+    UNIQUE(task_id, user_id)            -- one completion per user per task
+);
+
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_items_shop     ON items(shop_id);
 CREATE INDEX IF NOT EXISTS idx_items_status   ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_last_seen ON items(last_seen);
 CREATE INDEX IF NOT EXISTS idx_deals_shop     ON deals(shop_id);
 CREATE INDEX IF NOT EXISTS idx_credits_user   ON credit_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_shop     ON tasks(shop_id);
+CREATE INDEX IF NOT EXISTS idx_completions_user ON task_completions(user_id);
 """
 
 # ---------------------------------------------------------------------------
@@ -175,6 +195,37 @@ _SEED_SHOPS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Seed tasks (placeholder — swap for real tasks before the demo walk)
+# ---------------------------------------------------------------------------
+
+_SEED_TASKS = [
+    {
+        "task_id": "task-tesco-deal-sign",
+        "shop_id": "tesco-tcr",
+        "item_name": "Meal deal price board",
+        "needed": "current deal price",
+        "ask": "Photograph the full meal deal sign so the price is sharp and readable.",
+        "bonus_credits": 15,
+    },
+    {
+        "task_id": "task-pret-chicken-wrap",
+        "shop_id": "pret-tcr",
+        "item_name": "Chicken Caesar Wrap",
+        "needed": "price + allergens",
+        "ask": "Get the front label in frame. Make sure the allergen box is visible.",
+        "bonus_credits": 10,
+    },
+    {
+        "task_id": "task-ms-percy-pigs",
+        "shop_id": "ms-tcr",
+        "item_name": "Percy Pig sweets",
+        "needed": "price + meal deal eligibility",
+        "ask": "Photograph the shelf edge label. Check if there's a meal deal sticker.",
+        "bonus_credits": 10,
+    },
+]
+
+# ---------------------------------------------------------------------------
 # Seed rewards (mocked for hackathon — say so in the demo)
 # ---------------------------------------------------------------------------
 
@@ -223,6 +274,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
     _seed_shops(conn)
     _seed_rewards(conn)
+    _seed_tasks(conn)
     conn.commit()
 
 
@@ -247,6 +299,18 @@ def _seed_rewards(conn: sqlite3.Connection) -> None:
             (:reward_id, :sponsor, :title, :cost_credits, :codes_remaining, :expires)
         """,
         _SEED_REWARDS,
+    )
+
+
+def _seed_tasks(conn: sqlite3.Connection) -> None:
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO tasks
+            (task_id, shop_id, item_name, needed, ask, bonus_credits)
+        VALUES
+            (:task_id, :shop_id, :item_name, :needed, :ask, :bonus_credits)
+        """,
+        _SEED_TASKS,
     )
 
 
@@ -309,3 +373,49 @@ def get_user_credit_balance(conn: sqlite3.Connection, user_id: str) -> int:
         (user_id,),
     ).fetchone()
     return int(row[0])
+
+
+# ---------------------------------------------------------------------------
+# Task helpers
+# ---------------------------------------------------------------------------
+
+def fetch_all_tasks(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Return all tasks ordered by bonus_credits descending."""
+    return conn.execute(
+        "SELECT * FROM tasks ORDER BY bonus_credits DESC"
+    ).fetchall()
+
+
+def get_completed_task_ids(conn: sqlite3.Connection, user_id: str) -> set[str]:
+    """Return the set of task_ids this user has already completed."""
+    rows = conn.execute(
+        "SELECT task_id FROM task_completions WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    return {r["task_id"] for r in rows}
+
+
+def complete_task(
+    conn: sqlite3.Connection,
+    task_id: str,
+    user_id: str,
+    item_id: str | None = None,
+) -> bool:
+    """
+    Mark a task complete for a user. No-ops if already completed (UNIQUE constraint).
+    Returns True if a new completion was inserted, False if already done.
+    """
+    import uuid
+    from datetime import datetime
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO task_completions (completion_id, task_id, user_id, item_id, completed_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (str(uuid.uuid4()), task_id, user_id, item_id, datetime.utcnow().isoformat()),
+        )
+        conn.commit()
+        return True
+    except Exception:
+        return False
