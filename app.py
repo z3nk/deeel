@@ -232,9 +232,12 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 st.caption("Bought separately — no deal")
             # Freshness
             oldest = max(
-                (date.today() - date.fromisoformat(i.last_seen)).days
-                for i in [lunch.main, lunch.snack, lunch.drink]
-                if isinstance(i.last_seen, str)
+                (
+                    (date.today() - date.fromisoformat(i.last_seen)).days
+                    for i in [lunch.main, lunch.snack, lunch.drink]
+                    if isinstance(i.last_seen, str)
+                ),
+                default=0,
             )
             st.markdown(_freshness_badge(
                 (date.today() - __import__("datetime").timedelta(days=oldest)).isoformat()
