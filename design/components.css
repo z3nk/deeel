@@ -1,0 +1,101 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Figtree:wght@400;600;700&display=swap");
+
+/* Deeelicious component styles. Every value is a token from tokens.json.
+   Class prefix dl- so it can be injected into Streamlit through st.markdown inside a style element. */
+
+.dl-root { font-family: var(--font-ui); color: var(--text); font-size: 14px; line-height: 20px; }
+.dl-num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Buttons ---------- */
+.dl-btn { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 600;
+  padding: var(--space-2) var(--space-4); border-radius: var(--radius-button); border: var(--border-width-hairline) solid transparent; cursor: pointer; text-decoration: none; }
+.dl-btn--primary { background: var(--primary); color: var(--on-primary); }
+.dl-btn--secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+.dl-btn--link { background: transparent; color: var(--primary); padding-left: 0; padding-right: 0; }
+.dl-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.dl-btn[disabled] { background: var(--sample-tint); color: var(--text-muted); border-color: var(--border); cursor: not-allowed; }
+
+/* ---------- Badges / pills ---------- */
+.dl-badge { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-ui); font-size: 11px; line-height: 14px; font-weight: 600;
+  padding: 2px var(--space-2); border-radius: var(--radius-chip); white-space: nowrap; }
+.dl-badge--best { background: var(--primary); color: var(--on-primary); }
+.dl-badge--sample { background: var(--sample-tint); color: var(--sample); border: var(--border-width-hairline) dashed var(--sample-outline); }
+.dl-badge--unverified { background: var(--info-tint); color: var(--unverified); }
+.dl-badge--fresh { background: var(--success-tint); color: var(--fresh); }
+.dl-badge--ageing { background: var(--warning-tint); color: var(--ageing); }
+.dl-badge--stale { background: var(--sample-tint); color: var(--stale); }
+.dl-badge--credits { background: var(--success-tint); color: var(--success-ink); }
+
+/* ---------- Deeel score ---------- */
+.dl-score { display: inline-flex; align-items: baseline; gap: var(--space-1); font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 700;
+  padding: 3px 10px; border-radius: var(--radius-chip); color: var(--on-primary); font-variant-numeric: tabular-nums; }
+.dl-score--high { background: var(--score-high); }
+.dl-score--mid { background: var(--score-mid); }
+.dl-score--low { background: var(--score-low); }
+.dl-score__band { font-weight: 600; opacity: 1; }
+
+/* ---------- Chips ---------- */
+.dl-chip { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 600;
+  padding: 6px var(--space-3); border-radius: var(--radius-chip); border: var(--border-width-hairline) solid var(--border-strong); background: var(--surface); color: var(--text); }
+.dl-chip--allergy.is-on { background: var(--allergen); border-color: var(--allergen); color: var(--on-primary); }
+.dl-chip--diet.is-on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.dl-chip-heading { font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 700; margin: 0 0 var(--space-2); }
+.dl-chip-heading--allergy { color: var(--allergen-ink); }
+
+/* ---------- Warnings and boxes (serious mode: no stickers, no display face) ---------- */
+.dl-box { font-family: var(--font-ui); font-size: 14px; line-height: 20px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-button); border: var(--border-width-hairline) solid; }
+.dl-box--allergy { background: var(--allergen-tint); border-color: var(--allergen-ink); color: var(--allergen-ink); }
+.dl-box--sample { background: var(--sample-tint); border-color: var(--sample-outline); border-style: dashed; color: var(--sample); }
+.dl-box--info { background: var(--info-tint); border-color: var(--info); color: var(--text); }
+.dl-box strong { font-weight: 700; }
+.dl-allergen-line { font-family: var(--font-ui); font-size: 12px; line-height: 16px; color: var(--text); }
+.dl-allergen-line__warn { color: var(--allergen-ink); font-weight: 600; }
+
+/* ---------- Shop badge ---------- */
+.dl-shop { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: var(--radius-badge);
+  font-family: var(--font-ui); font-weight: 700; font-size: 14px; line-height: 1; flex: none; }
+.dl-shop--sm-text { font-size: 9px; }
+.dl-shop--tesco { background: var(--shop-tesco); color: var(--on-shop-light); }
+.dl-shop--sainsburys { background: var(--shop-sainsburys); color: var(--on-shop-dark); }
+.dl-shop--waitrose { background: var(--shop-waitrose); color: var(--on-shop-light); }
+.dl-shop--marks-and-spencer { background: var(--shop-marks-and-spencer); color: var(--on-shop-light); }
+.dl-shop--lidl { background: var(--shop-lidl); color: var(--on-shop-lidl); }
+.dl-shop--pret { background: var(--shop-pret); color: var(--on-shop-light); }
+.dl-shop--fallback { background: var(--shop-fallback); color: var(--text); }
+
+/* ---------- Result card ---------- */
+.dl-card { background: var(--surface); border: var(--border-width-hairline) solid var(--border); border-radius: var(--radius-card); padding: var(--space-3); font-family: var(--font-ui); color: var(--text); }
+.dl-card--featured { border: var(--border-width-strong) solid var(--primary); background: var(--primary-tint); }
+.dl-card--stale { background: var(--sample-tint); border-radius: var(--radius-button); }
+.dl-card__top { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.dl-card__rank { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: var(--radius-chip); font-size: 12px; font-weight: 700; color: var(--rank-ink); }
+.dl-card__rank--1 { background: var(--rank-1); }
+.dl-card__rank--2 { background: var(--rank-2); }
+.dl-card__rank--3 { background: var(--rank-3); }
+.dl-card__name { font-size: 16px; line-height: 22px; font-weight: 700; }
+.dl-card__walk { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-card--featured .dl-card__walk { color: var(--text); }
+.dl-card__basket { margin: var(--space-2) 0 var(--space-1); font-size: 14px; line-height: 20px; }
+.dl-card__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-card--featured .dl-card__meta { color: var(--text); }
+.dl-card__price-row { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+.dl-card__price { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dl-card__strike { text-decoration: line-through; color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.dl-card--featured .dl-card__strike { color: var(--text); }
+.dl-card__foot { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-3); }
+.dl-card__foot .dl-btn--link { margin-left: auto; }
+
+/* Hype: the savings sticker */
+.dl-sticker { display: inline-block; font-family: var(--font-display); font-weight: 800; font-size: 14px; line-height: 18px; padding: 2px var(--space-2);
+  background: var(--accent-yellow); color: var(--on-accent); border: var(--border-width-strong) solid var(--text); border-radius: var(--radius-button); box-shadow: var(--shadow-sticker); transform: rotate(-2deg); }
+.dl-plain-deal { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text); }
+
+/* ---------- Deal comparison ---------- */
+.dl-compare { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); font-family: var(--font-ui); }
+.dl-compare__opt { background: var(--surface); border: var(--border-width-hairline) solid var(--border); border-radius: var(--radius-card); padding: var(--space-3); }
+.dl-compare__opt.is-winner { border: var(--border-width-strong) solid var(--primary); }
+.dl-compare__label { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-compare__price { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dl-compare__na { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text-muted); }
+.dl-compare__note { font-size: 12px; line-height: 16px; margin-top: var(--space-1); }
+.dl-compare__note--win { color: var(--success-ink); font-weight: 600; }

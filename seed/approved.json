@@ -1,5 +1,5 @@
 {
- "exported_at": "2026-10-15T16:18:23+00:00",
+ "exported_at": "2026-10-15T17:01:15+00:00",
  "counts": {
   "items": 425,
   "deals": 2
@@ -491,13 +491,18 @@
    "meal_deal_eligible": 1,
    "temperature": "cold",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "celery"
+   ],
+   "ingredients_text": "Jus de Poire (28%), Jus d’Ananas (18%), Purée de Poire (17%), Céleri (13%), Jus de Concombre (10%), Purée d'Épinard (5%), Jus de Citron (4,5%), Jus de Laitue Romaine (3,5%), Extraits d'Épinard et d'Ortie, Vitamine C (acide ascorbique). \r\nContient des Antioxydants & des Polyphénols.",
    "meats": null,
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: Coldpress Coldpress Mean Greens Juice)",
+    "allergens": "Open Food Facts (name match: Coldpress Coldpress Mean Greens Juice)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_f9035c580cf8.jpg",
@@ -771,13 +776,20 @@
    "meal_deal_eligible": 1,
    "temperature": "cold",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "milk"
+   ],
+   "ingredients_text": "Skimmed Milk (89% Water, Milk protein concentrate (2.7%), Fat reduced Cocoa powder (1.5%), Stabilisers (cellulose, cellulose gum, gellan gum), Flavouring, Vitamins (niacin, vitamin D, vitamin B12, folic acid), Sweetener (sucralose).",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 198.8,
+   "protein_g": 25.0,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: For Goodness Shakes Protein Chocolate Flavour Shake)",
+    "protein_g": "Open Food Facts (name match: For Goodness Shakes Protein Chocolate Flavour Shake)",
+    "ingredients_text": "Open Food Facts (name match: For Goodness Shakes Protein Chocolate Flavour Shake)",
+    "allergens": "Open Food Facts (name match: For Goodness Shakes Protein Chocolate Flavour Shake)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_8911cf61d693.jpg",
@@ -1108,12 +1120,16 @@
    "temperature": "cold",
    "diet_flags": [],
    "allergens": [],
-   "ingredients_text": null,
+   "ingredients_text": "17 squeezed oranges (100%)",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 553.5,
+   "protein_g": 12.2,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: innocent pure fruit juice SMOOTH ORANGE)",
+    "protein_g": "Open Food Facts (name match: innocent pure fruit juice SMOOTH ORANGE)",
+    "ingredients_text": "Open Food Facts (name match: innocent pure fruit juice SMOOTH ORANGE)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_8911cf61d693.jpg",
@@ -1136,12 +1152,16 @@
    "temperature": "cold",
    "diet_flags": [],
    "allergens": [],
-   "ingredients_text": null,
+   "ingredients_text": "Orange Juice",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 580.5,
+   "protein_g": 9.9,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: innocent Orange juice with bits)",
+    "protein_g": "Open Food Facts (name match: innocent Orange juice with bits)",
+    "ingredients_text": "Open Food Facts (name match: innocent Orange juice with bits)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_8911cf61d693.jpg",
@@ -5598,12 +5618,16 @@
    "temperature": "ambient",
    "diet_flags": [],
    "allergens": [],
-   "ingredients_text": null,
+   "ingredients_text": "Fried corn, roasted coated peas (green peas (57%), corn starch, modified corn starch, sugar, sunflower oil, salt), sunflower oil, BBQ seasoning (yeast extract, demerara sugar, natural flavouring, salt, onion powder, sugar, potato starch, smoked dextrose powder, garlic powder, smoked paprika powder, acid: citric acid, tomato powder, chilli powder, colour: paprika extract, vegetable oils (canola, coconut)).",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 464.0,
+   "protein_g": 9.6,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: graze Smoky Barbecue Crunch)",
+    "protein_g": "Open Food Facts (name match: graze Smoky Barbecue Crunch)",
+    "ingredients_text": "Open Food Facts (name match: graze Smoky Barbecue Crunch)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_a5b1a6da415e.jpg",
@@ -5821,13 +5845,20 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "milk",
+    "nuts",
+    "soy"
+   ],
+   "ingredients_text": "Almonds, caramel flavoured coating (chicony roat fibre, palm lemal oll, sugar, whole millk powder, skim milk powder, cocoa processed with alkali, emulsifier (sunflower lecithin), sea salt, natural flavouring), chicony roat fibre, honey, glucose syrup, rice crisps (rice flour), sea salt, emulsifier (soya lecithin). (May contain: peanuts and other nuts) 663kJ (8%)/",
    "meats": null,
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: Kind Caramel Almond & Sea salt bar)",
+    "allergens": "Open Food Facts (name match: Kind Caramel Almond & Sea salt bar)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_0c586c6b224d.jpg",
@@ -5877,13 +5908,20 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "nuts",
+    "peanuts",
+    "soy"
+   ],
+   "ingredients_text": "Peanuts, almonds, dark chocolate (sugar, Cocoa mass, cocoa butter, fat-reduced cocoa powder, emulsifier soya lecithin, natural flavouring), protein crisps - (soya protein isolate, tapioca starch, salt), glucose syrup, honey, cocoa mass, emulsifier soya lecithin, sea salt. (May contain: milk, other nuts), GI FR Best before: see front of pack",
    "meats": null,
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: Kind Dark chocolate nut)",
+    "allergens": "Open Food Facts (name match: Kind Dark chocolate nut)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_0c586c6b224d.jpg",
@@ -5905,13 +5943,21 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "milk",
+    "nuts",
+    "peanuts",
+    "soy"
+   ],
+   "ingredients_text": "Peanuts, almonds, hazelnuts, fructo-oligosaccharide, cashews. honey, glucose syrup, hazelnut butter, milk chocolate (sugar, whole milk powder, cocoa butter, cocoa mass, emulsifier soya lecithin, natural flavouring), cocoa mass, natural flavouring.",
    "meats": null,
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: Kind Hazelnut butter milk chocolate)",
+    "allergens": "Open Food Facts (name match: Kind Hazelnut butter milk chocolate)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "sainsburys-warren-st/general/2026-10-15_0c586c6b224d.jpg",
@@ -7644,12 +7690,16 @@
    "temperature": "cold",
    "diet_flags": [],
    "allergens": [],
-   "ingredients_text": null,
+   "ingredients_text": "Carbonated Water, Colour (E150d) Sweeteners (Aspartame, Acesulfame K), Acids (Phosphoric Acid, Citric Acid), Flavourings (Including Caffeine), Preservative (Potassium Sorbate).",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 8.0,
+   "protein_g": 0.0,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: Pepsi Max Carbonated Low Calorie Cola Flavoured Soft Drink with Sweeteners)",
+    "protein_g": "Open Food Facts (name match: Pepsi Max Carbonated Low Calorie Cola Flavoured Soft Drink with Sweeteners)",
+    "ingredients_text": "Open Food Facts (name match: Pepsi Max Carbonated Low Calorie Cola Flavoured Soft Drink with Sweeteners)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/drink/2026-10-15_c5ec6ea1476a.jpg",
@@ -8716,15 +8766,23 @@
    "meal_deal_eligible": 1,
    "temperature": "cold",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "egg",
+    "fish",
+    "gluten",
+    "mustard"
+   ],
+   "ingredients_text": "Wheat Flour [Wheat Flour, Calcium Carbonate, Iron, Niacin, Thiamin], Tuna (Fish) (22%), Water, Sweetcorn (15%), Malted Wheat Flakes, Rapeseed Oil, Wheat Bran, Cornflour, Spirit Vinegar, Sugar, Salt, Yeast, Malted Barley Flour, Pasteurised Egg, Emulsifiers (Mono - and Diglycerides of Fatty Acids, Mono - and Diacetyl Tartaric Acid Esters of Mono - and Diglycerides of Fatty Acids), Wheat Gluten, Pasteurised Egg Yolk, Malted Wheat Flour, Concentrated Lemon Juice, White Pepper, Brown Mustard Seeds, Flour Treatment Agent (Ascorbic Acid), Palm Oil. Allergy Advice For allergens, including cereals containing gluten, see ingredients in bold. Caution This product can contain minor bones. STORAGE Keep refrigerated.",
    "meats": [
     "fish"
    ],
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: TESCO TUNA & SWEETCORN)",
+    "allergens": "Open Food Facts (name match: TESCO TUNA & SWEETCORN)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/general/2026-10-15_1049a18bf960.jpg",
@@ -9342,13 +9400,22 @@
    "meal_deal_eligible": 0,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "gluten",
+    "milk",
+    "soy"
+   ],
+   "ingredients_text": "Sucre, pâte de cacao, farine de riz (9.2%), lait écrémé en poudre, beurre de cacao, matière grasse de palmiste, matière grasse de palme, amidon, perméat de lactosérum (lait), matière grasse du lait, sirop de glucose, matière grasse de karité, extrait de malt d'orge, stabilisant (gomme arabique), sel, dextrine. emulsifiant (lécithine de soja), dextrose, agent d'enrobage (cire de carnauba), colorants, arôme, huile De palmiste. (Peut contenir: cacahuètes, amandes, noisettes). N Gepofte rijst (16%) in nekchocolade (55%) in een gekleurd suikerlaagje. Ingrediënten: suiker, cacaomassa, rijstemeel (9.2%). magere melkpoeder, cacaoboter, palmpitvet, palmvet, zetmeel, weipermeaat (melk), botervet melk), glucosestroop, sheavet, gerstemoutextract, stabilisator (Arabische gom), zout, dextrine, emuigator (sojalecithine), dextrose, glansmiddel (carnaubawas), kleurstoffen, aroma, palmpitolie. (Kan bevatten: pinda's, amandelen, hazelnoten). *E100, E120, E133, E160a, E160e, E170. [FR] Le chocolat au lait contient des matières grasses végétales en plus du beurre de cacao. NO Melkchocolade bevat naast cacaoboter ook andere plantaardige vetten. Mars Wrigley Confectionery, 3 Chemin de la Sandlach. CS 10036-67 501 Haguenau Cedex-00969 320 680. www.marsfrance.fr [NO] Mars Nederland B.V., Postbus 81, 5460 AB Veghel 0900 2356277, www.mars.com FR 340g",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 1645.6,
+   "protein_g": 14.6,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: M&ms M&ms crispy)",
+    "protein_g": "Open Food Facts (name match: M&ms M&ms crispy)",
+    "ingredients_text": "Open Food Facts (name match: M&ms M&ms crispy)",
+    "allergens": "Open Food Facts (name match: M&ms M&ms crispy)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_2a6b2e12737d.jpg",
@@ -10378,13 +10445,23 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "milk",
+    "nuts",
+    "peanuts",
+    "soy"
+   ],
+   "ingredients_text": "Peanuts, caramel flavoured coating (chicory root fibre, palm kernel oil, sugar, whole milk powder, skim milk powder, fat-reduced cocoa powder, emulsifier sunflower lecithin, sea salt, natural flavouring), protein crisps (soya protein isolate, tapioca starch, sea salt), chicory root fibre, honey, glucose syrup, peanut butter, sea salt.",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 643.9,
+   "protein_g": 30.2,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: KIND Protein Bar)",
+    "protein_g": "Open Food Facts (name match: KIND Protein Bar)",
+    "ingredients_text": "Open Food Facts (name match: KIND Protein Bar)",
+    "allergens": "Open Food Facts (name match: KIND Protein Bar)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_b9b4e44f2de9.jpg",
@@ -10576,13 +10653,22 @@
    "diet_flags": [
     "vegan"
    ],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "gluten",
+    "nuts",
+    "soy"
+   ],
+   "ingredients_text": "Hazelnut and Cocoa Filling (50%) [Hazelnuts (47%), Sugar, Cocoa Butter, Emulsifier: Sunflower Lecithin. Salt, Sugar, egetable Fat (Coconut), Defatted Cocoa Powder, Wheat Flour, Cocoa liquor, Emulsifier: Soya Lecithin, Com Starch, Vegetable Fibre Wheat), Salt Raising Agent: Sodium Bicarbonate, Malt Barley Extract.",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 235.2,
+   "protein_g": 2.3,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: Love Raw Love Raw cre&m filled wafer bars)",
+    "protein_g": "Open Food Facts (name match: Love Raw Love Raw cre&m filled wafer bars)",
+    "ingredients_text": "Open Food Facts (name match: Love Raw Love Raw cre&m filled wafer bars)",
+    "allergens": "Open Food Facts (name match: Love Raw Love Raw cre&m filled wafer bars)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_1e4e124d890e.jpg",
@@ -10974,13 +11060,20 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "gluten"
+   ],
+   "ingredients_text": "Potatoes, Sunflower Oil, Salt & Malt Vinegar Flavour [Salt, Natural Flavouring, Sugar, Dextrose, Acid: Citric Acid, Rice Flour, Dried Yeast Extract, Maltodextrin, Stabiliser: Potassium Phosphate, Dried BARLEY Malt Vinegar Extract].",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 223.0,
+   "protein_g": 2.9,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: McCoy's Salt & Malt Vinegar Flavour Potato Crisps)",
+    "protein_g": "Open Food Facts (name match: McCoy's Salt & Malt Vinegar Flavour Potato Crisps)",
+    "ingredients_text": "Open Food Facts (name match: McCoy's Salt & Malt Vinegar Flavour Potato Crisps)",
+    "allergens": "Open Food Facts (name match: McCoy's Salt & Malt Vinegar Flavour Potato Crisps)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_674a2a3d1cb2.jpg",
@@ -11758,13 +11851,22 @@
    "meal_deal_eligible": 1,
    "temperature": "ambient",
    "diet_flags": [],
-   "allergens": [],
-   "ingredients_text": null,
+   "allergens": [
+    "celery",
+    "gluten",
+    "milk",
+    "mustard",
+    "soy"
+   ],
+   "ingredients_text": "potatoes, sunflower oil (26%), rapeseed oil, flame grilled steak seasoning. flame grilled steak seasoning: [dried milk whey, salt, butter extract (from milk), sugar, dried onion, flavourings, colour (paprika extract), smoke flavourings].\r\nmade in a factory that also handles: wheat, gluten, barley, soya, celery, mustard.",
    "meats": null,
    "kcal": null,
    "protein_g": null,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "ingredients_text": "Open Food Facts (name match: Walkers Max Flame Grilled Steak Crisps)",
+    "allergens": "Open Food Facts (name match: Walkers Max Flame Grilled Steak Crisps)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_708459bb85ef.jpg",
@@ -11899,12 +12001,16 @@
    "temperature": "ambient",
    "diet_flags": [],
    "allergens": [],
-   "ingredients_text": null,
+   "ingredients_text": "potatoes, vegetable oils (sunflower, rapeseed, in varying proportions), salt ,  (flavouring, dried vinegar, salt, acid (citric acid), potassium chloride, sugar)",
    "meats": null,
-   "kcal": null,
-   "protein_g": null,
+   "kcal": 129.0,
+   "protein_g": 1.5,
    "barcode": null,
-   "external_fields": {},
+   "external_fields": {
+    "kcal": "Open Food Facts (name match: Walkers Salt and Vinegar Flavour Potato Crisps)",
+    "protein_g": "Open Food Facts (name match: Walkers Salt and Vinegar Flavour Potato Crisps)",
+    "ingredients_text": "Open Food Facts (name match: Walkers Salt and Vinegar Flavour Potato Crisps)"
+   },
    "premium_range": 0,
    "quality_rating": null,
    "source_image": "tesco-tcr/snack/2026-10-15_83d11c614251.jpg",
@@ -12099,13 +12205,13 @@
    "status": "approved"
   },
   {
-   "deal_id": "ae3f25b4",
+   "deal_id": "2c86c04a",
    "shop_id": "tesco-tcr",
    "name": "Meal Deal",
    "price_gbp": 4.25,
    "loyalty_price_gbp": 3.85,
    "loyalty_scheme": "Clubcard",
-   "source_image": "tesco-tcr/snack/2026-10-15_b9b4e44f2de9.jpg",
+   "source_image": "tesco-tcr/snack/2026-10-15_1e4e124d890e.jpg",
    "last_seen": "2026-10-15",
    "submitted_by": null,
    "status": "approved"

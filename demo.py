@@ -18,7 +18,6 @@ from models import Preferences
 from optimiser import get_results, shop_deal
 from shop_images import logo_html
 
-GREEN = "#0F7B5F"
 
 DEMO_PREFS = Preferences(
     sort="deeel",
@@ -47,9 +46,9 @@ _STEPS = [
 
 def _chip(text: str) -> str:
     return (
-        f'<span style="display:inline-block;background:#E7F3EF;color:{GREEN};'
-        f'font-size:13px;font-weight:600;padding:4px 12px;border-radius:999px;'
-        f'margin:0 6px 6px 0">{text}</span>'
+        f'<span class="dl-type-label" style="display:inline-block;background:var(--primary-tint);color:var(--primary);'
+        f'padding:var(--space-1) var(--space-3);border-radius:var(--radius-chip);'
+        f'margin:0 var(--space-2) var(--space-2) 0">{text}</span>'
     )
 
 

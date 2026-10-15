@@ -318,7 +318,10 @@ class TestShopImages:
         monkeypatch.setattr(shop_images, "LOGO_DIR", tmp_path)
         for chain in ("tesco", "sainsburys", "waitrose", "marks-and-spencer", "lidl", "pret"):
             shop = SHOP_A.model_copy(update={"chain": chain})
-            assert shop_images.logo_html(shop).startswith("<svg")
+            html = shop_images.logo_html(shop)
+            assert f'class="dl-shop dl-shop--{chain}' in html                  # token-backed class
+            standalone = shop_images.logo_html(shop, standalone=True)          # map popup (iframe)
+            assert "var(--" not in standalone and "background:#" in standalone
 
     def test_logo_file_used_when_present(self, tmp_path, monkeypatch):
         import shop_images

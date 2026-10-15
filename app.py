@@ -38,6 +38,7 @@ from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
 from ingredients import assess as assess_ingredients
 from admin import is_admin, render_admin_sidebar
+from theme import inject_theme
 from map_view import build_map
 from photo_store import (
     PHOTO_TYPE_LABELS, PHOTO_TYPES, UPLOAD_EXTENSIONS, UPLOAD_ROOT, save_photo, set_storefront,
@@ -69,6 +70,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+inject_theme()   # design system: fonts, :root tokens, .dl-* classes (design/tokens.json)
 
 # ---------------------------------------------------------------------------
 # DB + cached data loaders
@@ -162,7 +164,7 @@ def render_sidebar() -> Preferences:
 
     # Allergens — safety first, red label
     st.sidebar.markdown(
-        '<p style="color:#DC2626;font-weight:700;margin-bottom:4px">Allergies — avoid</p>',
+        '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
         unsafe_allow_html=True,
     )
     avoid = st.sidebar.multiselect(
@@ -268,11 +270,10 @@ def _freshness_badge(last_seen_str: str) -> str:
     except Exception:
         return ""
     if days > 14:
-        return f'<span style="background:#F1F5F9;color:#94A3B8;font-size:11px;padding:2px 8px;border-radius:999px">● Seen {days}d ago</span>'
+        return f'<span class="dl-badge dl-badge--stale">● Seen {days}d ago</span>'
     if days > 7:
-        return f'<span style="background:#FFFBEB;color:#D97706;font-size:11px;padding:2px 8px;border-radius:999px">● Seen {days}d ago</span>'
-    label = "Seen today" if days <= 0 else f"Seen {days}d ago"
-    return f'<span style="background:#F0FDF4;color:#16A34A;font-size:11px;padding:2px 8px;border-radius:999px">● {label}</span>'
+        return f'<span class="dl-badge dl-badge--ageing">● Seen {days}d ago</span>'
+    return f'<span class="dl-badge dl-badge--fresh">● Seen {days}d ago</span>'
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
@@ -343,80 +344,39 @@ def _item_nutrition(item) -> str:
     return text
 
 
-def _deeel_colour(total: int) -> str:
+def _deeel_band(total: int) -> str:
+    """.dl-score--<band> modifier (score-high / score-mid / score-low tokens)."""
     if total >= 70:
-        return "#16A34A"
+        return "high"
     if total >= 50:
-        return "#D97706"
-    return "#94A3B8"
+        return "mid"
+    return "low"
 
 
 def _render_deeel(lunch, prefs: Preferences) -> None:
-    """Deeel score badge that reveals the score breakdown popover on hover or click."""
+    """Deeel score badge + a popover with the weighted breakdown."""
     d = lunch_deeel(lunch, prefs)
-    colour = _deeel_colour(d.total)
-
-    factors_html = []
-    for k, weight in DEEEL_WEIGHTS.items():
-        pct = max(0.0, min(100.0, d.parts[k] * 100))
-        part_colour = _deeel_colour(round(pct))
-        factors_html.append(
-            f'<div style="margin-bottom:8px;">'
-            f'<div style="font-size:12px;margin-bottom:3px;">'
-            f'<b>{html.escape(DEEEL_LABELS[k])}</b>'
-            f'</div>'
-            f'<div style="background:rgba(128,128,128,0.2);border-radius:999px;height:7px;overflow:hidden;">'
-            f'<div style="background:{part_colour};width:{pct:.1f}%;height:100%;border-radius:999px;"></div>'
-            f'</div>'
-            f'</div>'
+    badge_col, info_col = st.columns([1, 2])
+    with badge_col:
+        st.markdown(
+            f'<span class="dl-score dl-score--{_deeel_band(d.total)}">Deeel {d.total}</span>',
+            unsafe_allow_html=True,
         )
-    factors_rendered = "\n".join(factors_html)
-
-    items_html = []
-    for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
-        a = assess_ingredients(item.ingredients_text)
-        via = f" · ingredients from {item.external_fields['ingredients_text']}" \
-            if "ingredients_text" in item.external_fields else ""
-        items_html.append(
-            f'<div style="font-size:11px;margin-top:4px;line-height:1.4;">'
-            f'<b>{html.escape(label)}</b> · {html.escape(item.name)}: '
-            f'<b>{a.score * 100:.0f}/100</b> — {html.escape(a.reason() + via)}'
-            f'</div>'
-        )
-    items_rendered = "\n".join(items_html)
-
-    partial_note = ""
-    if d.partial:
-        partial_note = (
-            '<div style="font-size:11px;opacity:0.75;margin-top:8px;font-style:italic;line-height:1.35;">'
-            'Some label info is missing. Unknown nutrition scores half marks; unknown ingredients score below an average label.'
-            '</div>'
-        )
-
-    badge_html = (
-        f'<div class="deeel-popover-wrapper">'
-        f'<details>'
-        f'<summary>'
-        f'<span style="background:{colour};color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;box-shadow:0 1px 2px rgba(0,0,0,0.15);" title="Hover or click to view Deeel score breakdown">'
-        f'Deeel score {d.total} <span style="font-size:9px;opacity:0.85;">▼</span>'
-        f'</span>'
-        f'</summary>'
-        f'<div class="deeel-dropdown-menu">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.2);">'
-        f'<span style="font-size:13px;font-weight:700;">Deeel score breakdown</span>'
-        f'<span style="background:{colour};color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;">{d.total} / 100</span>'
-        f'</div>'
-        f'{factors_rendered}'
-        f'<div style="font-size:11px;opacity:0.85;margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.15);line-height:1.35;">'
-        f'<b>Ingredient quality</b>: fewer processing markers (additives like emulsifiers, preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. The main counts double.'
-        f'</div>'
-        f'{items_rendered}'
-        f'{partial_note}'
-        f'</div>'
-        f'</details>'
-        f'</div>'
-    )
-    st.html(badge_html)
+    with info_col.popover("How it's scored"):
+        for k, weight in DEEEL_WEIGHTS.items():
+            pts = weight * d.parts[k]
+            st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
+        st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
+                   "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
+                   "The main counts double.")
+        for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
+            a = assess_ingredients(item.ingredients_text)
+            via = f" · ingredients from {item.external_fields['ingredients_text']}" \
+                if "ingredients_text" in item.external_fields else ""
+            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}{via}")
+        if d.partial:
+            st.caption("Some label info is missing. Unknown nutrition scores half marks; "
+                       "unknown ingredients score below an average label.")
 
 
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):
@@ -426,10 +386,9 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         col1, col2, col3 = st.columns([3, 2, 1])
         with col1:
             rank_str = f"#{rank} " if rank > 0 else ""
-            badge = ' <span style="background:#0F7B5F;color:white;font-size:10px;padding:2px 8px;border-radius:999px">Best match</span>' if featured else ""
+            badge = ' <span class="dl-badge dl-badge--best">Best match</span>' if featured else ""
             if is_sample(lunch):
-                badge += (' <span style="background:#F1F5F9;color:#475569;border:1px dashed #94A3B8;font-size:10px;'
-                          'padding:2px 8px;border-radius:999px">Sample data</span>')
+                badge += ' <span class="dl-badge dl-badge--sample">Sample data</span>'
             st.markdown(
                 f"{logo_html(lunch.shop)}<b>{rank_str}{lunch.shop.name}</b>{badge}",
                 unsafe_allow_html=True,
@@ -459,7 +418,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 st.caption("✅ Meal deal — some items are only priced as part of the deal")
             elif lunch.used_deal and sep_price > lunch.price_gbp:
                 st.markdown(
-                    f'<span style="text-decoration:line-through;color:#94A3B8">£{sep_price:.2f} separately</span>',
+                    f'<span class="dl-card__strike">£{sep_price:.2f} separately</span>',
                     unsafe_allow_html=True,
                 )
                 st.caption(f"✅ Meal deal saves £{sep_price - lunch.price_gbp:.2f}")
@@ -577,10 +536,10 @@ def screen_find(prefs: Preferences):
             for shop in shops:
                 if shop.shop_id in stale_shop_ids:
                     st.markdown(
-                        f'<div style="opacity:0.4;border:1px solid #E3E3DE;border-radius:8px;'
+                        f'<div style="opacity:0.4;border:var(--border-width-hairline) solid var(--border);border-radius:var(--radius-button);'
                         f'padding:12px;margin-bottom:8px">'
                         f'{logo_html(shop, size=20)}<b>{shop.name}</b> · {shop.walking_minutes:.0f} min walk · '
-                        f'<span style="color:#94A3B8">Data too old</span></div>',
+                        f'<span style="color:var(--text-muted)">Data too old</span></div>',
                         unsafe_allow_html=True,
                     )
 
@@ -1108,9 +1067,9 @@ def screen_upload():
     # ── Shop + photo type ───────────────────────────────────────────────────
     if active_task:
         st.markdown(
-            f'<div style="border:2px solid #0F7B5F;border-radius:8px;padding:12px;margin-bottom:12px">'
+            f'<div style="border:var(--border-width-strong) solid var(--primary);border-radius:var(--radius-button);padding:var(--space-3);margin-bottom:var(--space-3)">'
             f'<b>Task: {active_task["item_name"]}</b> at {shops_by_id.get(active_task["shop_id"], active_task["shop_id"])}<br>'
-            f'<span style="color:#6B7280;font-size:13px">{active_task["ask"]}</span></div>',
+            f'<span class="dl-type-small" style="color:var(--text-muted)">{active_task["ask"]}</span></div>',
             unsafe_allow_html=True,
         )
         shop_id = active_task["shop_id"]
@@ -1196,25 +1155,26 @@ def screen_upload():
             is_active = task["task_id"] == st.session_state.get("active_task_id")
             shop_display = shops_by_id.get(task["shop_id"], task["shop_id"])
 
-            border = "2px solid #0F7B5F" if is_active else "1px solid #E3E3DE"
-            bg = "#F0FDF4" if is_done else ("#F7F7F4" if is_active else "#FFFFFF")
+            border = ("var(--border-width-strong) solid var(--primary)" if is_active
+                      else "var(--border-width-hairline) solid var(--border)")
+            bg = "var(--success-tint)" if is_done else ("var(--bg)" if is_active else "var(--surface)")
 
             with cols[i % 3]:
                 st.markdown(
                     f'<div style="border:{border};border-radius:8px;background:{bg};padding:12px;margin-bottom:8px">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
                     f'<b>{task["item_name"]}</b>'
-                    f'<span style="background:#DCFCE7;color:#16A34A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px">+{task["bonus_credits"]} credits</span>'
+                    f'<span class="dl-badge dl-badge--credits">+{task["bonus_credits"]} credits</span>'
                     f'</div>'
-                    f'<div style="color:#6B7280;font-size:12px">{shop_display}</div>'
-                    f'<div style="color:#6B7280;font-size:12px">Needed: {task["needed"]}</div>'
-                    f'<div style="color:#1F2328;font-size:12px;margin-top:4px">{task["ask"]}</div>'
+                    f'<div class="dl-type-small" style="color:var(--text-muted)">{shop_display}</div>'
+                    f'<div class="dl-type-small" style="color:var(--text-muted)">Needed: {task["needed"]}</div>'
+                    f'<div class="dl-type-small" style="color:var(--text);margin-top:var(--space-1)">{task["ask"]}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
                 if is_done:
                     st.markdown(
-                        '<span style="color:#16A34A;font-weight:700">Done ✓</span>',
+                        '<span style="color:var(--success-ink);font-weight:700">Done ✓</span>',
                         unsafe_allow_html=True,
                     )
                 elif is_active:
@@ -1299,9 +1259,9 @@ def screen_credits():
             return "—"
 
         STATUS_COLOURS = {
-            "earn":     ("#16A34A", "Approved"),
-            "spend":    ("#0F7B5F", "Redeemed"),
-            "reversal": ("#DC2626", "Not accepted"),
+            "earn":     ("var(--success-ink)", "Approved"),
+            "spend":    ("var(--primary)", "Redeemed"),
+            "reversal": ("var(--danger)", "Not accepted"),
         }
 
         hdr1, hdr2, hdr3 = st.columns([3, 2, 1])
@@ -1310,7 +1270,7 @@ def screen_credits():
         hdr3.caption("**Credits**")
 
         for event in history:
-            colour, label = STATUS_COLOURS.get(event["type"], ("#6B7280", event["type"]))
+            colour, label = STATUS_COLOURS.get(event["type"], ("var(--text-muted)", event["type"]))
             shop_name = _ref_to_shop(event["ref_id"]) if event.get("ref_id") else "—"
             sign = "+" if event["credits"] > 0 else ""
 

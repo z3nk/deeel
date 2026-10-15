@@ -16,17 +16,19 @@ import folium
 
 from models import Lunch, Shop
 from optimiser import WALK_SPEED_MPM, is_sample
-from shop_images import brand_colour, brand_text_colour, logo_html
+from theme import token, type_css
+from shop_images import logo_html
 
 # UCL Main Quad, Gower Street
 CAMPUS_LAT = 51.5246
 CAMPUS_LNG = -0.1340
 
-# Marker colours matching UI_BRIEF colour tokens
-COLOUR_RANK1 = "#16A34A"   # green
-COLOUR_RANK2 = "#EAB308"   # yellow
-COLOUR_RANK3 = "#F97316"   # orange
-COLOUR_GREY  = "#94A3B8"   # out of range / filtered
+# Marker colours from design/tokens.json. The map renders in its own iframe, so
+# CSS variables don't reach it: resolved values via theme.token() instead.
+COLOUR_RANK1 = token("rank-1")     # green
+COLOUR_RANK2 = token("rank-2")     # yellow
+COLOUR_RANK3 = token("rank-3")     # orange
+COLOUR_GREY  = token("rank-out")   # out of range / filtered
 
 
 def _rank_colour(rank: int) -> str:
@@ -70,11 +72,11 @@ def build_map(
     folium.Circle(
         location=[campus_lat, campus_lng],
         radius=radius_m,
-        color="#0F7B5F",
+        color=token("primary"),
         weight=2,
         dash_array="6 4",
         fill=True,
-        fill_color="#0F7B5F",
+        fill_color=token("primary"),
         fill_opacity=0.05,
         tooltip=f"{int(walking_limit_minutes)} min walk radius",
     ).add_to(m)
@@ -99,12 +101,11 @@ def build_map(
 
         if shop.shop_id in ranked_index:
             rank, lunch = ranked_index[shop.shop_id]
-            colour = brand_colour(shop.chain)
-            num_colour = brand_text_colour(shop.chain)
+            colour = _rank_colour(rank)
             deal_label = "Meal deal" if lunch.used_deal else "Separate"
             sample_note = "<br><i>Sample data — not photographed yet</i>" if is_sample(lunch) else ""
             popup_html = (
-                f"{logo_html(shop, size=22)}<b>#{rank} {shop.name}</b><br>"
+                f"{logo_html(shop, size=22, standalone=True)}<b>#{rank} {shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
                 f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}<br>"
@@ -118,9 +119,8 @@ def build_map(
             marker_tooltip = f"#{rank} {shop.name}" + (" (sample data)" if is_sample(lunch) else "")
         else:
             colour = COLOUR_GREY
-            num_colour = "#FFFFFF"
             popup_html = (
-                f"{logo_html(shop, size=22)}<b>{shop.name}</b><br>"
+                f"{logo_html(shop, size=22, standalone=True)}<b>{shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"<i>Outside your filters</i><br>"
                 f'<div style="margin-top:8px;">'
@@ -152,8 +152,8 @@ def build_map(
                 popup=folium.Popup(popup_html, max_width=240),
                 tooltip=marker_tooltip,
                 icon=folium.DivIcon(
-                    html=f'<div style="font-size:11px;font-weight:700;color:{num_colour};'
-                         f'text-align:center;line-height:24px;pointer-events:none;">{rank}</div>',
+                    html=f'<div style="{type_css("caption")};font-weight:700;color:{token("rank-ink")};'
+                         f'text-align:center;line-height:24px;">{rank}</div>',
                     icon_size=(24, 24),
                     icon_anchor=(12, 12),
                 ),
