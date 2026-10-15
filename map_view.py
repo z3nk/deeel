@@ -46,15 +46,20 @@ def get_carto_tiles_url() -> str:
     """
     Resolve the CARTO basemap tile URL.
 
-    Reads CARTO_API_KEY from Streamlit secrets or environment variables (.env).
-    If set, appends ?api_key=<key>. Supports custom CARTO_TILES_URL override if configured.
+    Reads CARTO_API_KEY or CARTO_KEY from Streamlit secrets or environment (.env).
+    CARTO basemaps requires '?key=<token>' query parameter.
     """
     api_key = None
     try:
-        api_key = st.secrets.get("CARTO_API_KEY")
+        api_key = (
+            st.secrets.get("CARTO_API_KEY")
+            or st.secrets.get("CARTO_KEY")
+            or st.secrets.get("carto_api_key")
+            or st.secrets.get("carto_key")
+        )
     except Exception:
         pass
-    api_key = api_key or os.environ.get("CARTO_API_KEY")
+    api_key = api_key or os.environ.get("CARTO_API_KEY") or os.environ.get("CARTO_KEY")
 
     custom_url = None
     try:
@@ -64,8 +69,9 @@ def get_carto_tiles_url() -> str:
     base_url = (custom_url or os.environ.get("CARTO_TILES_URL") or CARTO_TILES_URL).strip()
 
     if api_key and api_key.strip():
+        clean_key = api_key.strip()
         delim = "&" if "?" in base_url else "?"
-        return f"{base_url}{delim}api_key={api_key.strip()}"
+        return f"{base_url}{delim}key={clean_key}"
     return base_url
 
 

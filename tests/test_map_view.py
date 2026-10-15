@@ -19,10 +19,10 @@ def test_get_carto_tiles_url(monkeypatch):
     assert get_carto_tiles_url() == CARTO_TILES_URL
 
     monkeypatch.setenv("CARTO_API_KEY", "carto-test-key-1234")
-    assert get_carto_tiles_url() == f"{CARTO_TILES_URL}?api_key=carto-test-key-1234"
+    assert get_carto_tiles_url() == f"{CARTO_TILES_URL}?key=carto-test-key-1234"
 
     monkeypatch.setenv("CARTO_TILES_URL", "https://custom.tiles.example.com/{z}/{x}/{y}.png")
-    assert get_carto_tiles_url() == "https://custom.tiles.example.com/{z}/{x}/{y}.png?api_key=carto-test-key-1234"
+    assert get_carto_tiles_url() == "https://custom.tiles.example.com/{z}/{x}/{y}.png?key=carto-test-key-1234"
 
 
 def test_logo_data_uri():
