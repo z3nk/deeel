@@ -25,6 +25,7 @@ from PIL import Image
 from dotenv import load_dotenv
 
 from models import Deal, Item
+from openfoodfacts import normalise_barcode
 
 load_dotenv()
 
@@ -101,6 +102,8 @@ CRITICAL RULES — read carefully:
 3b. kcal and protein_g: per whole pack, from the printed nutrition panel. If only
    per-100g values are printed and the pack weight is printed, scale them;
    otherwise null. Never estimate.
+3c. barcode: the digits under the product's barcode (on the pack or shelf label), only
+   if every digit is clearly readable. Otherwise null. Never guess digits.
 4. confidence: set to "high" if the label is fully readable, "medium" if partially
    readable, "low" if the label is too blurry, occluded, or absent.
 5. needs_review: set to true if confidence is not "high", or if any field is ambiguous.
@@ -126,6 +129,7 @@ Return a JSON object with exactly these fields:
   "meats": ["<see rule 3a>"] or null,
   "kcal": <number per pack or null>,
   "protein_g": <number per pack or null>,
+  "barcode": "<see rule 3c, or null>",
   "premium_range": <true | false | null>,
   "quality_rating": null,
   "source_image": "{filename}",
@@ -354,6 +358,7 @@ Return a JSON object with exactly these fields:
       "meats": ["<see rule 3a>"] or null,
       "kcal": <number per pack or null>,
       "protein_g": <number per pack or null>,
+      "barcode": "<see rule 3c, or null>",
       "premium_range": <true | false | null>,
       "source_text": "<exact label wording used for price, diet flags and allergens>",
       "confidence": "<high | medium | low>"
@@ -458,6 +463,8 @@ def build_item(fields: dict, shop_id: str, source_rel: str, photo_date: date,
         meats=fields.get("meats"),
         kcal=fields.get("kcal"),
         protein_g=fields.get("protein_g"),
+        barcode=normalise_barcode(fields.get("barcode")),
+        external_fields=fields.get("external_fields") or {},
         premium_range=fields.get("premium_range"),
         source_image=source_rel,
         source_text=fields.get("source_text") or "",

@@ -45,6 +45,7 @@ def _row_to_item(row: sqlite3.Row) -> Item:
     d["diet_flags"] = json.loads(d["diet_flags"])
     d["allergens"] = json.loads(d["allergens"])
     d["meats"] = None if d.get("meats") is None else json.loads(d["meats"])
+    d["external_fields"] = json.loads(d.get("external_fields") or "{}")
     d["meal_deal_eligible"] = (
         None if d["meal_deal_eligible"] is None else bool(d["meal_deal_eligible"])
     )

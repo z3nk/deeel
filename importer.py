@@ -25,6 +25,7 @@ from PIL import Image
 
 import approval
 from extract import build_deal, build_item, extract_photo
+from nutrition_fill import fill_missing
 from photo_store import PHOTO_TYPES, UPLOAD_EXTENSIONS, save_photo, set_storefront, storefront_upload
 
 DEFAULT_INBOX = Path(__file__).parent / "seed" / "inbox"
@@ -161,6 +162,7 @@ def import_inbox(
 
             queued = 0
             for fields in result.items:
+                fields = fill_missing(conn, fields)   # barcode: our data, then Open Food Facts
                 if fields.get("price_gbp") is None:
                     report.unpriced.append(f"{label}: {fields.get('name')}")
                     continue

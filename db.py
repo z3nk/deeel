@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS items (
     meats               TEXT,           -- JSON array or NULL (unknown)
     kcal                REAL,           -- per pack, NULL = not on label
     protein_g           REAL,           -- per pack, NULL = not on label
+    barcode             TEXT,           -- EAN/UPC digits, NULL = not read
+    external_fields     TEXT,           -- JSON {field: source} for values not from this label
     premium_range       INTEGER,        -- 1/0/NULL
     quality_rating      REAL,
     source_image        TEXT NOT NULL,
@@ -290,7 +292,8 @@ def _init_db(conn: sqlite3.Connection) -> None:
     _auto_seed_items(conn)
 
 
-_ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL"}
+_ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL",
+                       "barcode": "TEXT", "external_fields": "TEXT"}
 
 # Bump when FALLBACK_ITEMS/FALLBACK_* data in seed/load_seed.py changes, so existing
 # databases (including the deployed one) drop and reload their fallback rows.

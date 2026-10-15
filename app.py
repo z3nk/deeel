@@ -32,6 +32,7 @@ from db import (
     upsert_user,
 )
 from extract import build_deal, build_item, extract_photo
+from nutrition_fill import fill_existing, fill_missing
 from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
 from ingredients import assess as assess_ingredients
@@ -240,6 +241,12 @@ def _allergen_line(items_list, avoid: list[str]) -> str:
 
 def _nutrition_line(items_list) -> str:
     """'1,040 kcal · 31 g protein' for the meal, or '' if any value is missing."""
+    if any(f in i.external_fields for i in items_list for f in ("kcal", "protein_g")):
+        return _nutrition_line_plain(items_list) + " · partly from Open Food Facts / other photos"
+    return _nutrition_line_plain(items_list)
+
+
+def _nutrition_line_plain(items_list) -> str:
     parts = []
     if all(i.kcal is not None for i in items_list):
         parts.append(f"{sum(i.kcal for i in items_list):,.0f} kcal")
@@ -248,13 +255,36 @@ def _nutrition_line(items_list) -> str:
     return " · ".join(parts)
 
 
+_FIELD_NAMES = {"kcal": "kcal", "protein_g": "protein", "ingredients_text": "ingredients"}
+
+
+def _sources_text(external: dict) -> str:
+    """'kcal, protein: Open Food Facts' — empty when everything came from the label."""
+    by_source: dict[str, list[str]] = {}
+    for field, source in external.items():
+        by_source.setdefault(source, []).append(_FIELD_NAMES.get(field, field))
+    return "; ".join(f"{', '.join(fields)}: {source}" for source, fields in by_source.items())
+
+
+def _keep_sources(original: dict, row: dict) -> dict:
+    """Drop a field's source if the reviewer changed its value by hand."""
+    sources = dict(original.get("external_fields") or {})
+    for field in ("kcal", "protein_g"):
+        if field in sources and _clean_number(row[field]) != _clean_number(original.get(field)):
+            sources.pop(field)
+    return sources
+
+
 def _item_nutrition(item) -> str:
     parts = []
     if item.kcal is not None:
         parts.append(f"{item.kcal:.0f} kcal")
     if item.protein_g is not None:
         parts.append(f"{item.protein_g:.0f} g protein")
-    return " · ".join(parts) or "nutrition not on label"
+    text = " · ".join(parts) or "nutrition not on label"
+    if sources := _sources_text({k: v for k, v in item.external_fields.items() if k in ("kcal", "protein_g")}):
+        text += f" ({sources})"
+    return text
 
 
 def _deeel_colour(total: int) -> str:
@@ -284,7 +314,9 @@ def _render_deeel(lunch, prefs: Preferences) -> None:
                    "The main counts double.")
         for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
             a = assess_ingredients(item.ingredients_text)
-            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}")
+            via = f" · ingredients from {item.external_fields['ingredients_text']}" \
+                if "ingredients_text" in item.external_fields else ""
+            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}{via}")
         if d.partial:
             st.caption("Some label info is missing. Unknown nutrition scores half marks; "
                        "unknown ingredients score below an average label.")
@@ -426,7 +458,8 @@ def screen_find(prefs: Preferences):
                         unsafe_allow_html=True,
                     )
 
-        st.caption("Sponsors never affect ranking.")
+        st.caption("Sponsors never affect ranking. Some nutrition data from "
+                   "[Open Food Facts](https://world.openfoodfacts.org) (ODbL), where our photo didn't show it.")
 
     with map_tab:
         all_ranked = [primary] + alternatives + other_shops if primary else []
@@ -670,7 +703,8 @@ def _read_photos(conn, files, shop_id: str, photo_type: str) -> list[dict]:
             else:
                 result = extract_photo(saved.path, shop_id, photo_type)
                 entry.update(kind=result.kind, notes=result.notes,
-                             items=result.items, deals=result.deals)
+                             items=[fill_missing(conn, i) for i in result.items],
+                             deals=result.deals)
         except Exception as exc:
             entry["error"] = str(exc)
         batch.append(entry)
@@ -680,7 +714,7 @@ def _read_photos(conn, files, shop_id: str, photo_type: str) -> list[dict]:
 
 
 _ITEM_COLUMNS = ["include", "name", "category", "price_gbp", "meal_deal_eligible",
-                 "temperature", "kcal", "protein_g", "allergens", "confidence"]
+                 "temperature", "kcal", "protein_g", "allergens", "filled_from", "confidence"]
 
 
 def _items_frame(items: list[dict]):
@@ -695,6 +729,7 @@ def _items_frame(items: list[dict]):
         "kcal": i.get("kcal"),
         "protein_g": i.get("protein_g"),
         "allergens": ", ".join(i.get("allergens") or []),
+        "filled_from": _sources_text(i.get("external_fields") or {}),
         "confidence": i.get("confidence") or "medium",
     } for i in items]
     return pd.DataFrame(rows, columns=_ITEM_COLUMNS)
@@ -733,7 +768,7 @@ def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
                     hide_index=True,
                     num_rows="fixed",
                     use_container_width=True,
-                    disabled=["confidence"],
+                    disabled=["confidence", "filled_from"],
                     column_config={
                         "include": st.column_config.CheckboxColumn("Submit", width="small"),
                         "name": st.column_config.TextColumn("Product", required=True),
@@ -744,6 +779,7 @@ def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
                         "kcal": st.column_config.NumberColumn("kcal", min_value=0),
                         "protein_g": st.column_config.NumberColumn("Protein g", min_value=0.0),
                         "allergens": st.column_config.TextColumn("Allergens (from label)"),
+                        "filled_from": st.column_config.TextColumn("Not from this label"),
                         "confidence": st.column_config.TextColumn("Read quality"),
                     },
                 )
@@ -806,6 +842,7 @@ def _submit_batch(conn, batch, edited_items, edited_deals, banners, user_id) -> 
                 "temperature": row["temperature"],
                 "kcal": _clean_number(row["kcal"]),
                 "protein_g": _clean_number(row["protein_g"]),
+                "external_fields": _keep_sources(entry["items"][row_no], row),
                 "allergens": [a.strip() for a in (row["allergens"] or "").split(",") if a.strip()],
             }
             try:
@@ -1127,6 +1164,17 @@ def screen_review():
 
     if flash := st.session_state.pop("review_flash", None):
         st.success(flash)
+
+    with st.expander("Fill missing nutrition by barcode"):
+        st.caption("For products with a barcode but no kcal / protein / ingredients: first our own "
+                   "label data for the same barcode, then Open Food Facts. Allergens are never filled.")
+        if st.button("Fill missing now", key="fill_missing"):
+            if is_admin():
+                with st.spinner("Looking up barcodes…"):
+                    checked, filled = fill_existing(conn)
+                _load_data.clear()
+                st.session_state["review_flash"] = f"Checked {checked} product(s), filled {filled} field(s)."
+                st.rerun()
 
     if not records:
         st.success("Queue is empty — nothing to review.")

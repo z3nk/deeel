@@ -7,7 +7,7 @@ All three record types (Shop, Deal, Item) plus User, CreditEvent, Reward.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -95,6 +95,11 @@ class Item(BaseModel):
     # Per pack, from the printed nutrition panel. None = not on label / unreadable
     kcal: Optional[float] = None
     protein_g: Optional[float] = None
+    # EAN/UPC digits if printed and readable (check digit validated)
+    barcode: Optional[str] = None
+    # Fields NOT read from this item's own label → where they came from,
+    # e.g. {"kcal": "Open Food Facts"}. Allergens/diet/meats never appear here.
+    external_fields: Dict[str, str] = Field(default_factory=dict)
     premium_range: Optional[bool] = None
     quality_rating: Optional[float] = None      # 1–5, from student ratings only
     source_image: str

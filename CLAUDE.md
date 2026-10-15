@@ -6,6 +6,7 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 ## Rules
 - Python only, SQLite for storage, Streamlit for the UI.
 - No scraping. Data comes from in-store photos and a hand-collected seed walk.
+- One exception: missing kcal / protein / ingredients may be filled BY BARCODE (`nutrition_fill.py`): first our own label data for the same barcode, then the Open Food Facts API (ODbL, credited in the app). Only gaps are filled; sources are stored in `Item.external_fields` and shown. Allergens, diet flags and meats are never filled this way.
 - Allergen and diet info comes only from printed label text. Unknown means unsafe.
 - Credits are paid only when a record is approved. Pending items are shown but unpaid.
 - Never commit .env or the API key.

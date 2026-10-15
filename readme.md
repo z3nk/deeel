@@ -94,6 +94,8 @@ admin.py          Team passcode gate for the Review queue
 shop_images.py    Shop logos / storefront photos
 photo_store.py    uploads/<shop_id>/<general|main|snack|drink>/ photo filing
 importer.py       seed/inbox/ drag-and-drop batch import (python seed/load_seed.py --inbox)
+nutrition_fill.py Fill missing nutrition by barcode: our data, then Open Food Facts
+openfoodfacts.py  Open Food Facts API client (barcode lookup, per-pack values)
 map_view.py       Folium map helper
 ledger.py         Credit ledger and earning rules
 approval.py       Pending/approved/rejected flow
@@ -106,6 +108,7 @@ tests/            pytest suite
 ## Data integrity
 
 - Diet flags and allergens come **only** from printed label text — never inferred.
+- Missing kcal / protein / ingredients are filled by **barcode** only (check digit validated): first from our own photos of the same barcode, then from [Open Food Facts](https://world.openfoodfacts.org) (ODbL). Label values always win, per-pack figures are only used when the pack size is known, and the app shows where each filled value came from. Allergens and diet flags are never filled this way.
 - Items with unknown allergen data are excluded when allergen filters are active.
 - The Review queue is team-only: unlock it under **Team** in the sidebar with the shared `ADMIN_PASSCODE` (from `.env` locally or Streamlit secrets when deployed). With no passcode set it stays locked. Approve one product, a whole photo, or every clear read at once.
 - Re-uploading the same photo is detected by content hash.
