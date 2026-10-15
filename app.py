@@ -1098,7 +1098,8 @@ def screen_review():
 
     st.caption(f"{total} item{'s' if total != 1 else ''} pending")
 
-    for row in list(pending_items) + list(pending_deals):
+    # sqlite3.Row has no .get(); plain dicts let the cards below use defaults
+    for row in [dict(r) for r in list(pending_items) + list(pending_deals)]:
         record_type = "deal" if "deal_id" in row.keys() else "item"
         record_id = row["deal_id"] if record_type == "deal" else row["item_id"]
 

@@ -157,6 +157,11 @@ def approve(
     if not submitter:
         return 0
 
+    # credit_events.user_id is a foreign key; make sure the submitter exists
+    conn.execute(
+        "INSERT OR IGNORE INTO users (user_id, handle) VALUES (?, ?)",
+        (submitter, submitter),
+    )
     return apply_credits(conn, record_id, submitter, record_type)
 
 
