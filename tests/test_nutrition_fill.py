@@ -77,17 +77,17 @@ def test_our_data_first_then_open_food_facts(conn):
 
 
 def test_open_food_facts_not_called_when_our_data_covers_it(conn):
-    _queue(conn, barcode=COKE, kcal=210, protein_g=0, ingredients_text="Water, sugar")
+    _queue(conn, barcode=COKE, kcal=210, protein_g=0, ingredients_text="Water, sugar", allergens=["caffeine"])
     with patch("openfoodfacts._fetch") as off:
         out = fill_missing(conn, {"name": "Coke", "barcode": COKE})
     assert not off.called and set(out["external_fields"].values()) == {OUR_DATA}
 
 
-def test_label_values_never_overwritten_and_allergens_untouched(conn):
-    with patch("openfoodfacts.lookup", return_value=OFF_COKE):
-        out = fill_missing(conn, {"name": "Coke", "barcode": COKE, "kcal": 139, "allergens": []})
+def test_label_values_never_overwritten(conn):
+    with patch("openfoodfacts.lookup", return_value={**OFF_COKE, "allergens": ["milk"]}):
+        out = fill_missing(conn, {"name": "Coke", "barcode": COKE, "kcal": 139, "allergens": ["gluten"]})
     assert out["kcal"] == 139 and "kcal" not in out["external_fields"]
-    assert out["allergens"] == [] and "allergens" not in out["external_fields"]
+    assert out["allergens"] == ["gluten"] and "allergens" not in out["external_fields"]
 
 
 def test_open_food_facts_values_not_reused_as_our_data(conn):
@@ -118,3 +118,30 @@ def test_fill_existing_updates_db(conn):
                        (item_id,)).fetchone()
     assert (checked, filled) == (1, 3)
     assert row["kcal"] == 210.0 and json.loads(row["external_fields"])["kcal"] == openfoodfacts.SOURCE
+
+
+# --- allergens ---------------------------------------------------------------
+
+def test_off_allergen_tags_mapped_to_app_names():
+    product = {"allergens_tags": ["en:milk", "en:peanuts", "en:crustaceans", "en:unknown-thing"]}
+    assert per_pack(product)["allergens"] == ["milk", "nuts", "peanuts", "shellfish"]
+    assert "allergens" not in per_pack({"allergens_tags": []})     # empty = not entered, not "none"
+
+
+def test_missing_allergens_filled_and_sourced(conn):
+    _queue(conn, barcode=COKE, allergens=["milk"])                  # our label of the same barcode
+    out = fill_missing(conn, {"name": "Coke", "barcode": COKE, "allergens": []})
+    assert out["allergens"] == ["milk"] and out["external_fields"]["allergens"] == OUR_DATA
+    openfoodfacts._cache.clear()
+    with patch("openfoodfacts.lookup", return_value={"allergens": ["gluten"]}):
+        out = fill_missing(None, {"name": "Wrap", "barcode": COKE, "allergens": []})
+    assert out["allergens"] == ["gluten"] and out["external_fields"]["allergens"] == openfoodfacts.SOURCE
+
+
+def test_fill_existing_fills_allergens_in_db(conn):
+    item_id = _queue(conn, barcode=COKE)
+    with patch("openfoodfacts.lookup", return_value={"allergens": ["milk"]}):
+        fill_existing(conn)
+    row = conn.execute("SELECT allergens, external_fields FROM items WHERE item_id=?", (item_id,)).fetchone()
+    assert json.loads(row["allergens"]) == ["milk"]
+    assert json.loads(row["external_fields"])["allergens"] == openfoodfacts.SOURCE

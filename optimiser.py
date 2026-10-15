@@ -24,6 +24,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from deeel import DeeelScore, deeel_score, ingredient_score
+from openfoodfacts import SOURCE as OFF_SOURCE
 from models import Deal, Item, Lunch, Preferences, Shop
 
 # ---------------------------------------------------------------------------
@@ -109,12 +110,17 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
             if not all(req.lower() in item_flags_lower for req in prefs.diet_flags):
                 continue
 
-        # 3. Allergens — null allergens = unsafe when user has allergen needs
+        # 3. Allergens — unknown = unsafe when the user has allergen needs.
+        # Allergens from Open Food Facts (crowd-sourced) can mark an item unsafe
+        # below, but never make it pass: only printed-label allergens count as known.
         if prefs.allergens_exclude:
+            from_label = item.external_fields.get("allergens") != OFF_SOURCE
             if not item.allergens:  # allergens unknown → exclude
                 continue
             item_allergens_lower = [a.lower() for a in item.allergens]
             if any(excl.lower() in item_allergens_lower for excl in prefs.allergens_exclude):
+                continue
+            if not from_label:      # online data says it's clear — not trusted for safety
                 continue
 
         # 3b. Temperature preference (only applies to mains)

@@ -406,3 +406,30 @@ def test_is_sample_flags_placeholder_meals():
     assert not is_sample(real)
     placeholder = real.main.model_copy(update={"source_image": "fallback.jpg"})
     assert is_sample(real.model_copy(update={"main": placeholder}))
+
+
+
+class TestAllergenSources:
+    """Online (Open Food Facts) allergens can exclude an item but never clear it."""
+
+    def _with(self, allergens, source):
+        item = _item("x", "shop-a", "main", 2.00, allergens=allergens)
+        return item.model_copy(update={"external_fields": {"allergens": source} if source else {}})
+
+    def test_label_allergens_pass_filter(self):
+        assert hard_filter([self._with(["milk"], None)], Preferences(allergens_exclude=["nuts"]), today=TODAY)
+
+    def test_same_barcode_label_allergens_pass_filter(self):
+        item = self._with(["milk"], "same barcode, another photo")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY)
+
+    def test_off_allergens_never_clear_an_item(self):
+        item = self._with(["milk"], "Open Food Facts")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY) == []
+
+    def test_off_allergens_still_exclude(self):
+        item = self._with(["nuts"], "Open Food Facts")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY) == []
+
+    def test_no_allergy_filter_shows_everything(self):
+        assert hard_filter([self._with(["milk"], "Open Food Facts")], Preferences(), today=TODAY)

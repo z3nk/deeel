@@ -7,9 +7,10 @@ the data is shown). We use its official API, never scraping.
 Rules:
 - Lookup is by barcode (EAN-8/12/13/14), and only after the check digit validates,
   so a misread barcode can't pull in a different product. No name matching.
-- Only fills fields that are missing: kcal, protein_g, ingredients_text. Never
-  overwrites label values. NEVER touches allergens, diet flags or meats — those
-  stay label-only (crowd-sourced data can be wrong or out of date).
+- Only fills fields that are missing: kcal, protein_g, ingredients_text, allergens.
+  Never overwrites label values. Never touches diet flags or meats.
+- Allergens from here are crowd-sourced: the optimiser lets them mark a product as
+  UNSAFE but never as safe for an allergy filter (see optimiser.hard_filter).
 - Values are per pack: per-100 g figures are scaled by the pack quantity, and left
   empty if Open Food Facts doesn't give one.
 - This is the FALLBACK. nutrition_fill.py first checks our own label data for the
@@ -26,7 +27,17 @@ import urllib.request
 SOURCE = "Open Food Facts"
 API_URL = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json?fields={fields}"
 API_FIELDS = ("product_name,nutriments,ingredients_text_en,ingredients_text,"
-              "quantity,product_quantity,product_quantity_unit")
+              "quantity,product_quantity,product_quantity_unit,allergens_tags")
+
+# Open Food Facts allergen tags → the app's allergen names (lowercase, as the filters use).
+# Peanuts also count as "nuts" so the Nuts filter errs on the safe side.
+ALLERGEN_TAGS = {
+    "en:gluten": ["gluten"], "en:milk": ["milk"], "en:eggs": ["egg"],
+    "en:nuts": ["nuts"], "en:peanuts": ["peanuts", "nuts"], "en:sesame-seeds": ["sesame"],
+    "en:soybeans": ["soy"], "en:fish": ["fish"], "en:crustaceans": ["shellfish"],
+    "en:molluscs": ["shellfish"], "en:celery": ["celery"], "en:mustard": ["mustard"],
+    "en:sulphur-dioxide-and-sulphites": ["sulphites"], "en:lupin": ["lupin"],
+}
 USER_AGENT = "Deeelicious/1.0 (UCL hackathon; https://github.com/z3nk/deeelicious)"
 TIMEOUT_S = 8
 
@@ -91,6 +102,10 @@ def per_pack(product: dict) -> dict:
     ingredients = (product.get("ingredients_text_en") or product.get("ingredients_text") or "").strip()
     if ingredients:
         out["ingredients_text"] = ingredients
+    # An empty tag list may just mean nobody entered them, so only fill when some are listed
+    allergens = sorted({a for tag in product.get("allergens_tags") or [] for a in ALLERGEN_TAGS.get(tag, [])})
+    if allergens:
+        out["allergens"] = allergens
     return out
 
 

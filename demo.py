@@ -162,8 +162,10 @@ def _step_filters(data, render_card) -> None:
             st.caption(label)
             st.markdown(_summary(primary), unsafe_allow_html=True)
     st.info(
-        "Allergens, diet, halal and kosher come **only from printed label text**. "
-        "If a label doesn't say, the item is hidden when that filter is on — unknown means unsafe."
+        "Diet, halal and kosher come **only from printed label text**. Allergens are read by computer "
+        "from labels, with gaps filled from Open Food Facts by barcode — but only printed-label allergens "
+        "can clear an item for an allergy filter; unknown means unsafe. "
+        "**Allergen info can be wrong — always check the packaging.**"
     )
 
 
@@ -225,7 +227,7 @@ def _step_photo(data, render_card) -> None:
                 ("Type", example.category),
                 ("Price", "meal deal only" if example.price_gbp is None else f"£{example.price_gbp:.2f}"),
                 ("Deal", "✅ eligible" if example.meal_deal_eligible else "Not in deal"),
-                ("Allergens", ", ".join(example.allergens) or "none on label"),
+                ("Allergens", (", ".join(example.allergens) or "none on label") + " · ⚠️ computer-read — check the pack"),
                 ("Meat", "not on label" if example.meats is None else (", ".join(example.meats) or "none")),
             ]
             for label, val in rows:

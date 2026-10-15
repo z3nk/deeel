@@ -110,6 +110,22 @@ def _ensure_user():
 # ---------------------------------------------------------------------------
 
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
+
+# Shown wherever allergen data appears
+ALLERGY_WARNING_SHORT = "⚠️ computer-read — check the pack"
+ALLERGY_WARNING = (
+    "⚠️ **Allergen information is read by computer** — from our photos of shelf labels and, "
+    "where a photo didn't show it, from online data (Open Food Facts). It can be wrong or "
+    "incomplete. **Always check the packaging yourself before eating.**"
+)
+
+
+def _allergen_text(item) -> str:
+    """'Allergens: milk, gluten (Open Food Facts) · ⚠️ computer-read — check the pack'."""
+    allergens = ", ".join(item.allergens) if item.allergens else "none found on label"
+    source = item.external_fields.get("allergens")
+    via = f" ({source})" if source else ""
+    return f"Allergens: {allergens}{via} · {ALLERGY_WARNING_SHORT}"
 DIETS     = ["Vegetarian", "Vegan", "Halal", "Kosher"]
 MEATS     = ["Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
@@ -145,7 +161,8 @@ def render_sidebar() -> Preferences:
     )
     avoid = [a for a in ALLERGENS if st.sidebar.checkbox(a, key=f"avoid_{a}")]
     if avoid:
-        st.sidebar.caption("Items with unchecked allergen labels are hidden.")
+        st.sidebar.caption("Items without allergen info from a printed label are hidden.")
+    st.sidebar.caption(ALLERGY_WARNING)
     st.sidebar.divider()
 
     # Diet
@@ -231,14 +248,13 @@ def _freshness_badge(last_seen_str: str) -> str:
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
-    unknown = any(not i.allergens and i.allergens is not None for i in items_list)
-    # null allergens (empty list + unknown) handled at filter level
-    has_null = any(i.allergens is None for i in items_list)
-    if has_null:
-        return "⚠️ **Allergens not checked** — label had no allergen text"
     all_allergens = sorted({a for i in items_list for a in i.allergens})
-    allergen_str = ", ".join(all_allergens) if all_allergens else "none listed"
-    return f"Contains (from label): {allergen_str}"
+    allergen_str = ", ".join(all_allergens) if all_allergens else "none found on labels"
+    if any(not i.allergens for i in items_list):
+        allergen_str += " (some items' allergens unknown)"
+    if any("allergens" in i.external_fields for i in items_list):
+        allergen_str += " (partly from Open Food Facts / other photos)"
+    return f"Allergens: {allergen_str} · {ALLERGY_WARNING_SHORT}"
 
 
 def _nutrition_line(items_list) -> str:
@@ -439,6 +455,8 @@ def screen_find(prefs: Preferences):
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
         st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
 
+        st.caption(ALLERGY_WARNING)
+
         # Section A — featured best option
         st.markdown("#### Your best option")
         render_result_card(primary, rank=1, prefs=prefs, featured=True)
@@ -551,6 +569,7 @@ def screen_detail():
         if pending in st.session_state:
             st.session_state[f"{key_prefix}_{cat}"] = st.session_state.pop(pending)
 
+    st.warning(ALLERGY_WARNING)
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -565,8 +584,7 @@ def screen_detail():
         if main.temperature == "hot":
             st.caption("🔥 hot")
         st.caption(_fmt_price(main))
-        allergens_str = ", ".join(main.allergens) if main.allergens else ("not checked" if main.allergens is None else "none listed")
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_allergen_text(main))
         st.caption(_item_nutrition(main))
         st.markdown(_freshness_badge(str(main.last_seen)), unsafe_allow_html=True)
         if main.status == "pending":
@@ -582,8 +600,7 @@ def screen_detail():
         snack = snacks[snack_idx]
         st.markdown(f"**{snack.name}**")
         st.caption(_fmt_price(snack))
-        allergens_str = ", ".join(snack.allergens) if snack.allergens else "none listed"
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_allergen_text(snack))
         st.caption(_item_nutrition(snack))
         st.markdown(_freshness_badge(str(snack.last_seen)), unsafe_allow_html=True)
 
@@ -597,8 +614,7 @@ def screen_detail():
         drink = drinks[drink_idx]
         st.markdown(f"**{drink.name}**")
         st.caption(_fmt_price(drink))
-        allergens_str = ", ".join(drink.allergens) if drink.allergens else "none listed"
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_allergen_text(drink))
         st.caption(_item_nutrition(drink))
         st.markdown(_freshness_badge(str(drink.last_seen)), unsafe_allow_html=True)
 
@@ -673,7 +689,7 @@ def screen_detail():
         hot_tag = " · 🔥 hot" if item.temperature == "hot" else ""
         nd_tag = " · *not in deal*" if item.meal_deal_eligible is False else ""
         pend_tag = " · ⚠️ unverified" if item.status == "pending" else ""
-        allergens = ", ".join(item.allergens) if item.allergens else ("not checked" if item.allergens is None else "none")
+        allergens = _allergen_text(item).removeprefix("Allergens: ")
 
         row_cols = st.columns([3, 1, 1, 2, 1, 1])
         with row_cols[0]:
@@ -807,7 +823,7 @@ def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
                         "temperature": st.column_config.SelectboxColumn("Temp", options=["hot", "cold", "ambient"]),
                         "kcal": st.column_config.NumberColumn("kcal", min_value=0),
                         "protein_g": st.column_config.NumberColumn("Protein g", min_value=0.0),
-                        "allergens": st.column_config.TextColumn("Allergens (from label)"),
+                        "allergens": st.column_config.TextColumn("Allergens (computer-read — check)"),
                         "filled_from": st.column_config.TextColumn("Not from this label"),
                         "confidence": st.column_config.TextColumn("Read quality"),
                     },
@@ -977,7 +993,8 @@ def screen_upload():
     if batch:
         st.markdown("#### What we found")
         st.caption("Check each product, fix anything wrong, untick anything that isn't right. "
-                   "⚠️ Allergen info is from the label only.")
+                   "Allergens are read by computer and must be checked against the pack.")
+        st.caption(ALLERGY_WARNING)
         edited_items, edited_deals, banners = _render_batch(batch, nonce)
         n_ticked = sum(int(f["include"].sum()) for f in edited_items.values()) + \
                    sum(int(f["include"].sum()) for f in edited_deals.values())
@@ -1176,7 +1193,7 @@ def _record_line(row: dict) -> str:
     return (
         f"**{row.get('name', '')}** · {row.get('category', '').upper()} · "
         f"{'meal deal only' if row.get('price_gbp') is None else f'£{row["price_gbp"]:.2f}'} · "
-        f"allergens: {', '.join(allergens) if allergens else 'not on label'}{flag}"
+        f"allergens: {', '.join(allergens) if allergens else 'not on label'} ({ALLERGY_WARNING_SHORT}){flag}"
     )
 
 
@@ -1211,7 +1228,8 @@ def screen_review():
 
     with st.expander("Fill missing nutrition by barcode"):
         st.caption("For products with a barcode but no kcal / protein / ingredients: first our own "
-                   "label data for the same barcode, then Open Food Facts. Allergens are never filled.")
+                   "label data for the same barcode, then Open Food Facts. Also fills missing allergens — "
+                   "Open Food Facts allergens are shown with a warning and never clear an item for an allergy filter.")
         if st.button("Fill missing now", key="fill_missing"):
             if is_admin():
                 with st.spinner("Looking up barcodes…"):
