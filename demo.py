@@ -24,12 +24,6 @@ DEMO_PREFS = Preferences(
     temperature_pref="any",
     max_price_gbp=6.0,
     max_walking_minutes=10.0,
-    has_clubcard=True,
-    has_nectar=True,
-    has_lidl_plus=True,
-    has_sparks=True,
-    has_mywaitrose=True,
-    has_club_pret=True,
 )
 
 _STEPS = [
@@ -123,7 +117,7 @@ def _step_results(data, render_card) -> None:
     st.info(
         "Each combination gets a **Deeel score** out of 100: value (30), fillingness (25), "
         "ingredient quality (25), nutrition balance (10) and deal saving (10). "
-        "Hover or tap the **Deeel score** badge on any card for the breakdown."
+        "Tap **How it's scored** on any card for the breakdown."
     )
     st.caption("Sponsors never affect ranking.")
 
@@ -133,8 +127,8 @@ def _step_map(data, render_card) -> None:
     primary, alternatives, other_shops = get_results(shops, items, deals, DEMO_PREFS)
     st.markdown("### See it on a map")
     st.markdown(
-        "The **Map view** tab shows the same results. Markers are colour-coded by "
-        "brand logo with rank numbers, grey for shops outside your filters, and the dashed circle "
+        "The **Map view** tab shows the same results. Markers are coloured by rank — "
+        "green #1, yellow #2, orange #3+, grey out of range — and the dashed circle "
         "is your walking limit."
     )
     ranked = [primary] + alternatives + other_shops if primary else []
@@ -237,7 +231,7 @@ def _step_photo(data, render_card) -> None:
             ]
             for label, val in rows:
                 st.markdown(f"**{label}:** {val}")
-    st.info("Credits are paid **only when your photo is approved**. Pending photos earn 0 until then.")
+    st.info("Credits are paid **only when our team approves** your photo. Pending photos earn 0 until then.")
     st.caption("Spend credits on rewards under **My credits**.")
 
 
