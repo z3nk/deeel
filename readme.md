@@ -1,6 +1,6 @@
-# Deeel — Meal Deal Finder
+# Deelicious
 
-A lunch optimiser for UCL Bloomsbury students. Set your preferences, and Deeel finds the best main + snack + drink combo across nearby shops — comparing meal deals against buying separately.
+A lunch optimiser for UCL Bloomsbury students. Set your preferences, and Deelicious finds the best main + snack + drink combo across nearby shops — comparing meal deals against buying separately.
 
 ## How it works
 

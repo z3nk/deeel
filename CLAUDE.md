@@ -1,4 +1,4 @@
-# Meal Deal Finder
+# Deelicious
 
 Hackathon project: ranks shops near UCL Bloomsbury and builds the best main + snack + drink.
 Read PLAN.md first. Read UI_BRIEF.md for the interface.

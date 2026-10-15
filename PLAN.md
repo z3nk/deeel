@@ -1,4 +1,4 @@
-# Meal Deal Finder: Build Plan
+# Deelicious: Build Plan
 
 Oct 12, 2026 · @Neeam R · **v2 — three-section results, map view, sidebar-only controls**
 

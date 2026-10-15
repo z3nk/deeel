@@ -1,5 +1,5 @@
 """
-Meal Deal Finder — Streamlit UI.
+Deelicious — Streamlit UI.
 
 Screens:
   1. Find       — three-section results (Section A/B/C) + Map view tab
@@ -55,7 +55,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="Meal Deal Finder",
+    page_title="Deelicious",
     page_icon="🥪",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -121,7 +121,7 @@ def _apply_pending_resets() -> None:
 
 def render_sidebar() -> Preferences:
     _apply_pending_resets()
-    st.sidebar.title("🥪 Meal Deal Finder")
+    st.sidebar.title("🥪 Deelicious")
 
     # Username
     st.sidebar.text_input(

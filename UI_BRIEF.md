@@ -1,4 +1,4 @@
-# Meal Deal Finder: UI/UX Brief
+# Deelicious: UI/UX Brief
 
 Oct 12, 2026 · @Neeam R · **v3 — three-section results, map view, sidebar-only controls**
 
