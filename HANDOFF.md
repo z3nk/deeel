@@ -5,19 +5,10 @@
 - **Test Suite Status**: All 92 tests passing (`pytest`)
 - **Base Parent**: Commit `8dd5d13` (unmerged from upstream `origin/main` commits)
 
-> **Merged into `main` (main treated as the source of truth).** What happened to each part:
-> - **Kept:** B — map "See basket" fix (selected-shop card + button under the map) and `#rank name` tooltips;
->   D — heading link icons hidden (moved into `design/components.css`); E — all loyalty cards default on;
->   F — per-scheme loyalty pricing (Clubcard, Nectar, Lidl Plus, Sparks, myWaitrose, Club Pret) and its tests;
->   the clearer empty-state messages and "Clear … filters" buttons (each clears exactly what its label says).
-> - **Not kept (conflicts with main's rules):** A — official supermarket logos (design rule: never use supermarket
->   logos); B — brand-coloured map pins (main uses rank colours with numbers); C — the custom score popover with
->   hard-coded red/amber/green bars (main uses tokens; red is reserved for allergens/danger); E — allergy dropdown
->   and removing the allergy disclaimer (main uses allergy chips and the always-visible warning); E — Hot/Cold
->   `segmented_control` (kept main's horizontal radio: AppTest can't drive single-select segmented controls and the
->   `required=` argument doesn't exist in the installed Streamlit).
-> - **Allergen semantics:** main keeps `[]` = "none found / unknown" → excluded under an allergy filter, because
->   extraction returns `[]` whenever allergens aren't printed or readable. The `None`-means-unknown change is not used.
+> **Merged into `main`.** All of sections A–F are in, with two adjustments:
+> - Colours (brand pins, score bars, badges) are read from `design/tokens.json` instead of hard-coded hex — same values.
+> - Allergens keep main's meaning: `[]` = none found / unknown → excluded under an allergy filter (extraction returns `[]`
+>   whenever allergens aren't printed or readable). The always-visible allergy warning stays next to the dropdown.
 
 ---
 

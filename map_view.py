@@ -41,6 +41,14 @@ def _rank_colour(rank: int) -> str:
     return COLOUR_GREY
 
 
+def _brand_colours(chain: str) -> tuple[str, str]:
+    """(pin fill, rank-number ink) in the shop's brand colour, from design/tokens.json."""
+    from shop_images import _BADGES
+    if chain in _BADGES:
+        return token(f"shop-{chain}"), token(_BADGES[chain][1])
+    return token("primary"), token("on-primary")
+
+
 def _walking_radius_metres(walking_limit_minutes: float) -> float:
     return walking_limit_minutes * WALK_SPEED_MPM
 
@@ -101,7 +109,7 @@ def build_map(
 
         if shop.shop_id in ranked_index:
             rank, lunch = ranked_index[shop.shop_id]
-            colour = _rank_colour(rank)
+            colour, num_colour = _brand_colours(shop.chain)
             deal_label = "Meal deal" if lunch.used_deal else "Separate"
             sample_note = "<br><i>Sample data — not photographed yet</i>" if is_sample(lunch) else ""
             popup_html = (
@@ -141,7 +149,7 @@ def build_map(
                 popup=folium.Popup(popup_html, max_width=240),
                 tooltip=marker_tooltip,
                 icon=folium.DivIcon(
-                    html=f'<div style="{type_css("caption")};font-weight:700;color:{token("rank-ink")};'
+                    html=f'<div style="{type_css("caption")};font-weight:700;color:{num_colour};'
                          f'text-align:center;line-height:24px;">{rank}</div>',
                     icon_size=(24, 24),
                     icon_anchor=(12, 12),

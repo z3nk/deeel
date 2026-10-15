@@ -41,7 +41,7 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 ## Map
 - A map view tab sits alongside the list view tab on Screen 1.
 - Uses `streamlit-folium` + `folium` with OpenStreetMap tiles. No API key needed.
-- Shop markers are coloured by rank: green (#1), yellow (#2), orange (#3+), grey (out of range).
+- Shop markers are in each shop's brand colour with the rank number; grey = out of range.
 - A dashed circle shows the walking-limit radius (minutes × 80 m/min).
 
 ## Claude model

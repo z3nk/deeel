@@ -131,8 +131,8 @@ def _step_map(data, render_card) -> None:
     primary, alternatives, other_shops = get_results(shops, items, deals, DEMO_PREFS)
     st.markdown("### See it on a map")
     st.markdown(
-        "The **Map view** tab shows the same results. Markers are coloured by rank — "
-        "green #1, yellow #2, orange #3+, grey out of range — and the dashed circle "
+        "The **Map view** tab shows the same results. Markers are in each shop's brand colour "
+        "with its rank number, grey for shops outside your filters, and the dashed circle "
         "is your walking limit."
     )
     ranked = [primary] + alternatives + other_shops if primary else []

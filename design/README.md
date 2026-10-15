@@ -44,7 +44,7 @@ Empty states name the cause and give a one-tap fix: "Relax to 15 min", "Clear di
 - Accents are for hype only. Put `on-accent` (dark) text on `accent-yellow` and `accent-cyan`, never white. Put white on `accent-violet`. The brand palette has no pinks or reds, so `danger` and `allergen` red always mean something.
 - Neutrals: page on `bg`, cards on `surface`, body text in `text`, secondary text in `text-muted` (on `surface` or `bg` only, never on tints). `border` is a decorative hairline. Outline chips and custom inputs with `border-strong`.
 - Use the `-ink` tokens for text and the base semantic tokens for fills or icons: `success-ink`, `warning-ink`, `allergen-ink`. The fills `success` and `warning` cannot carry white text.
-- Map markers use `rank-1`, `rank-2`, `rank-3` and `rank-out`, with a `rank-ink` number label on every marker. The walking-radius circle is dashed in `primary`.
+- Map markers use each shop's brand colour (`shop-*`) with the rank number in its `on-shop-*` ink; shops outside your filters use `rank-out`. The walking-radius circle is dashed in `primary`.
 - Deeel score bands use `score-high`, `score-mid` and `score-low`. Freshness uses `fresh`, `ageing` and `stale` on their tints.
 - Light theme only for launch. There is no dark mode.
 
@@ -102,7 +102,7 @@ Figtree and Bricolage Grotesque reach the page through the injected CSS (`@impor
 ## Imagery
 
 - Use real shelf photography shot by the team over stock food photos. Illustration is for accents only. No photos of people's faces.
-- Shop identity is the initials badge (ShopBadge). Never use supermarket logos, and keep chain badges out of marketing.
+- In the app, shop identity uses the official logos in `assets/logos/` (team decision), with the initials badge (ShopBadge) as the fallback. Keep supermarket logos and chain badges out of marketing.
 
 ## Marketing
 

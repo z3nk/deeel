@@ -219,9 +219,9 @@ def render_sidebar() -> Preferences:
             '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
             unsafe_allow_html=True,
         )
-        avoid = st.pills(
-            "Allergies — avoid", ALLERGENS, selection_mode="multi", key=ALLERGY_KEY,
-            label_visibility="collapsed",
+        avoid = st.multiselect(
+            "Allergies — avoid", ALLERGENS, key=ALLERGY_KEY,
+            label_visibility="collapsed", placeholder="Choose allergies to avoid…",
         ) or []
         if avoid:
             st.caption("Items without allergen info from a printed label are hidden.")
@@ -245,8 +245,7 @@ def render_sidebar() -> Preferences:
             key="meats_allowed",
             help="Only show mains whose label lists these meats. None picked = any.",
         ) or []
-        chip_css = (_chip_state_css(ALLERGY_KEY, ALLERGENS, "allergy")
-                    + _chip_state_css(DIET_KEY, DIETS, "diet")
+        chip_css = (_chip_state_css(DIET_KEY, DIETS, "diet")
                     + _chip_state_css("meats_allowed", MEATS, "diet"))
         if chip_css:
             st.html(chip_css)
@@ -270,15 +269,14 @@ def render_sidebar() -> Preferences:
         st.session_state["walk_limit"] = st.session_state.pop("walk_limit_override")
     st.session_state.setdefault("walk_limit", 10)
     walk_limit = st.sidebar.slider("Walking limit", 2, 30, format="%d min", key="walk_limit")
-    # Horizontal radio (not segmented_control: Streamlit's AppTest can't drive single-select
-    # segmented controls, which would break the app-level tests)
-    temp = st.sidebar.radio(
+    st.session_state.setdefault("temp_pref", "any")   # default via state: resets write this key
+    temp = st.sidebar.segmented_control(
         "Hot or cold main",
         options=["any", "hot", "cold"],
+        selection_mode="single",
         format_func=str.capitalize,
-        horizontal=True,
         key="temp_pref",
-    )
+    ) or "any"                                          # deselecting falls back to any
     st.sidebar.divider()
 
     # Loyalty cards
@@ -346,13 +344,11 @@ def render_filter_bar(prefs: Preferences) -> None:
                     )
                     # Mirror the sidebar's chips before rendering (never after)
                     st.session_state[ALLERGY_QUICK_KEY] = list(st.session_state.get(ALLERGY_KEY) or [])
-                    st.pills(
-                        "Allergies — avoid", ALLERGENS, selection_mode="multi", key=ALLERGY_QUICK_KEY,
-                        label_visibility="collapsed",
+                    st.multiselect(
+                        "Allergies — avoid", ALLERGENS, key=ALLERGY_QUICK_KEY,
+                        label_visibility="collapsed", placeholder="Choose allergies to avoid…",
                         on_change=_copy_quick_allergies,
                     )
-                    if quick_css := _chip_state_css(ALLERGY_QUICK_KEY, ALLERGENS, "allergy"):
-                        st.html(quick_css)
                     st.markdown(_allergy_box_html(), unsafe_allow_html=True)
                 st.caption("More filters (diet, budget, walk, sort): tap › at the top left.")
 
@@ -453,9 +449,15 @@ def _deeel_band(total: int) -> str:
 
 def _render_deeel_breakdown(lunch, d) -> None:
     """The "How it's scored" popover body: weighted parts + per-item ingredient reasons."""
-    for k, weight in DEEEL_WEIGHTS.items():
-        pts = weight * d.parts[k]
-        st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
+    bars = []
+    for k in DEEEL_WEIGHTS:
+        pct = max(0.0, min(100.0, d.parts[k] * 100))
+        bars.append(
+            f'<div class="dl-bar"><div class="dl-bar__label">{escape(DEEEL_LABELS[k])}</div>'
+            f'<div class="dl-bar__track"><div class="dl-bar__fill dl-bar__fill--{_deeel_band(round(pct))}" '
+            f'style="width:{pct:.1f}%"></div></div></div>'
+        )
+    st.markdown("".join(bars), unsafe_allow_html=True)
     st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
                "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
                "The main counts double.")
