@@ -331,3 +331,61 @@ class TestShopImages:
         kosher = _item("k", "shop-a", "main", 2.00, diet_flags=["Kosher"])
         result = hard_filter([plain, kosher], Preferences(diet_flags=["kosher"]), today=TODAY)
         assert [i.item_id for i in result] == ["k"]
+
+
+# ---------------------------------------------------------------------------
+# Deal-only items (no own price; only a meal deal price on the shelf)
+# ---------------------------------------------------------------------------
+
+class TestDealOnlyItems:
+    ITEMS = [
+        _item("deal-main", "shop-a", "main", 0, quality_rating=5),
+        _item("own-main",  "shop-a", "main", 3.00, quality_rating=2),
+        _item("s",         "shop-a", "snack", 1.00),
+        _item("d",         "shop-a", "drink", 1.00),
+    ]
+    # price 0 placeholder above → make the first truly deal-only
+    ITEMS[0] = ITEMS[0].model_copy(update={"price_gbp": None})
+
+    def test_deal_only_main_used_in_deal(self):
+        deal = [_deal("deal", "shop-a", 3.85)]
+        # Quality sort: the better-rated deal-only main wins, at the deal price
+        lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, deal, Preferences(sort="quality"))
+        assert lunch.main.item_id == "deal-main" and lunch.used_deal and lunch.price_gbp == 3.85
+        # Deeel: same £3.85, but the priced main has a KNOWN saving (£5 → £3.85), so it edges ahead;
+        # the deal-only main is still offered as an alternative
+        primary, alts, _ = get_results([SHOP_A], self.ITEMS, deal, Preferences(sort="deeel"), today=TODAY)
+        assert primary.main.item_id == "own-main" and primary.used_deal
+        assert [l.main.item_id for l in alts] == ["deal-main"] and alts[0].price_gbp == 3.85
+
+    def test_deal_only_main_never_bought_separately(self):
+        for sort in ("quality", "deeel"):
+            lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences(sort=sort))
+            assert lunch.main.item_id == "own-main" and not lunch.used_deal and lunch.price_gbp == 5.00
+
+    def test_no_priced_main_and_no_deal_means_no_lunch(self):
+        items = [self.ITEMS[0], self.ITEMS[2], self.ITEMS[3]]
+        assert best_lunch_for_shop(SHOP_A, items, [], Preferences()) is None
+
+    def test_alternatives_include_deal_only_mains(self):
+        _, alts, _ = get_results([SHOP_A], self.ITEMS, [_deal("deal", "shop-a", 3.85)], Preferences(), today=TODAY)
+        primary_and_alts = {l.main.item_id for l in alts} | {"deal-main"}
+        assert primary_and_alts == {"deal-main", "own-main"}
+
+    def test_deeel_score_partial_when_separate_price_unknown(self):
+        from optimiser import lunch_deeel
+        only_deal_main = [self.ITEMS[0], self.ITEMS[2], self.ITEMS[3]]
+        lunch = best_lunch_for_shop(SHOP_A, only_deal_main, [_deal("deal", "shop-a", 3.85)], Preferences(sort="deeel"))
+        d = lunch_deeel(lunch, Preferences())
+        assert d.parts["deal"] == 0.5 and d.partial
+
+
+def test_build_item_requires_price_or_meal_deal():
+    from datetime import date as _d
+    from extract import build_item
+    ok = build_item({"name": "Wrap", "category": "main", "price_gbp": None, "meal_deal_eligible": True,
+                     "confidence": "high"}, "shop-a", "x.jpg", _d(2026, 10, 15), None)
+    assert ok.price_gbp is None
+    with pytest.raises(ValueError):
+        build_item({"name": "Wrap", "category": "main", "price_gbp": None, "meal_deal_eligible": None,
+                    "confidence": "high"}, "shop-a", "x.jpg", _d(2026, 10, 15), None)

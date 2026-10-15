@@ -176,7 +176,7 @@ def _step_deal(data, render_card) -> None:
         return
     shop = primary.shop
     trio = (primary.main, primary.snack, primary.drink)
-    sep_price = sum(i.price_gbp for i in trio)
+    sep_price = None if any(i.price_gbp is None for i in trio) else sum(i.price_gbp for i in trio)
     deal = next((d for d in deals if d.shop_id == shop.shop_id), None)
     eligible = all(i.meal_deal_eligible for i in trio)
     st.markdown(
@@ -194,13 +194,15 @@ def _step_deal(data, render_card) -> None:
                 st.caption("One of these items isn't in the meal deal.")
             else:
                 st.markdown(f"**£{deal.price_gbp:.2f}**")
-                if deal.price_gbp < sep_price:
+                if sep_price is None:
+                    st.caption("✅ Best option — some items are only sold in the deal")
+                elif deal.price_gbp < sep_price:
                     st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
     with c2:
         with st.container(border=True):
             st.caption("Bought separately")
-            st.markdown(f"**£{sep_price:.2f}**")
-            if deal is None or not eligible or deal.price_gbp >= sep_price:
+            st.markdown("**Not available**" if sep_price is None else f"**£{sep_price:.2f}**")
+            if sep_price is not None and (deal is None or not eligible or deal.price_gbp >= sep_price):
                 st.caption("✅ Best option")
     st.caption("Tap **See basket** on any result to swap items and watch the price update.")
 
@@ -221,7 +223,7 @@ def _step_photo(data, render_card) -> None:
             rows = [
                 ("Item", example.name),
                 ("Type", example.category),
-                ("Price", f"£{example.price_gbp:.2f}"),
+                ("Price", "meal deal only" if example.price_gbp is None else f"£{example.price_gbp:.2f}"),
                 ("Deal", "✅ eligible" if example.meal_deal_eligible else "Not in deal"),
                 ("Allergens", ", ".join(example.allergens) or "none on label"),
                 ("Meat", "not on label" if example.meats is None else (", ".join(example.meats) or "none")),

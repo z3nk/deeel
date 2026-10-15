@@ -24,7 +24,7 @@ from typing import Callable
 from PIL import Image
 
 import approval
-from extract import build_deal, build_item, extract_photo
+from extract import build_deal, build_item, extract_photo, is_usable
 from nutrition_fill import fill_missing
 from photo_store import PHOTO_TYPES, UPLOAD_EXTENSIONS, save_photo, set_storefront, storefront_upload
 
@@ -52,7 +52,7 @@ class ImportReport:
             f"queued for review; {self.duplicates} duplicate(s) skipped; {self.banners} shop banner(s) set.",
         ]
         if self.unpriced:
-            lines.append(f"{len(self.unpriced)} product(s) had no readable price and were NOT queued "
+            lines.append(f"{len(self.unpriced)} product(s) had no readable price and no meal deal marking, so were NOT queued "
                          "(retake, or add them in the app):")
             lines += [f"  - {u}" for u in self.unpriced]
         if self.failed:
@@ -163,7 +163,7 @@ def import_inbox(
             queued = 0
             for fields in result.items:
                 fields = fill_missing(conn, fields)   # barcode: our data, then Open Food Facts
-                if fields.get("price_gbp") is None:
+                if not is_usable(fields):           # no own price and not in the meal deal
                     report.unpriced.append(f"{label}: {fields.get('name')}")
                     continue
                 try:

@@ -64,7 +64,7 @@ def deeel_score(
     snack: Item,
     drink: Item,
     price_gbp: float,
-    separate_price_gbp: float,
+    separate_price_gbp: float | None,
 ) -> DeeelScore:
     trio = (main, snack, drink)
     partial = False
@@ -91,8 +91,12 @@ def deeel_score(
     if not all(known for _, known in scored):
         partial = True
 
-    saving = (separate_price_gbp - price_gbp) / separate_price_gbp if separate_price_gbp > 0 else 0.0
-    parts["deal"] = _clamp(saving / SAVING_FULL)
+    if separate_price_gbp is None:          # deal-only item in the meal: saving unknown
+        parts["deal"] = NEUTRAL
+        partial = True
+    else:
+        saving = (separate_price_gbp - price_gbp) / separate_price_gbp if separate_price_gbp > 0 else 0.0
+        parts["deal"] = _clamp(saving / SAVING_FULL)
 
     total = sum(WEIGHTS[k] * parts[k] for k in WEIGHTS)
     return DeeelScore(total=round(total), exact=total, parts=parts, partial=partial)

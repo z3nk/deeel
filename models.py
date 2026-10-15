@@ -83,7 +83,9 @@ class Item(BaseModel):
     shop_id: str
     name: str
     category: Category
-    price_gbp: float
+    # The item's own price. None = only a meal deal price was shown (deal-only item:
+    # never used for 'bought separately'). Must be meal_deal_eligible if None.
+    price_gbp: Optional[float] = None
     loyalty_price_gbp: Optional[float] = None
     meal_deal_eligible: Optional[bool] = None   # null = unknown
     temperature: Temperature

@@ -234,12 +234,29 @@ def _quality_score(item: Item) -> float:
     return q
 
 
-def _effective_price(item: Item, prefs: Preferences) -> float:
+def _effective_price(item: Item, prefs: Preferences) -> Optional[float]:
+    """The item's own price (loyalty price if the user has a card). None = deal-only."""
     if prefs.has_clubcard and item.loyalty_price_gbp is not None:
         return item.loyalty_price_gbp
     if prefs.has_nectar and item.loyalty_price_gbp is not None:
         return item.loyalty_price_gbp
     return item.price_gbp
+
+
+def _separate_price(items, prefs: Preferences) -> Optional[float]:
+    """Total bought separately, or None if any item is deal-only."""
+    prices = [_effective_price(i, prefs) for i in items]
+    return None if any(p is None for p in prices) else sum(prices)
+
+
+def _price_or_inf(item: Item, prefs: Preferences) -> float:
+    """Sort key: deal-only items (no own price) go last."""
+    price = _effective_price(item, prefs)
+    return float("inf") if price is None else price
+
+
+def _priced(items: list[Item], prefs: Preferences) -> list[Item]:
+    return [i for i in items if _effective_price(i, prefs) is not None]
 
 
 def score_lunch(
@@ -275,7 +292,7 @@ def _deal_price(deal: Deal, prefs: Preferences) -> float:
 
 def lunch_deeel(lunch: Lunch, prefs: Preferences) -> DeeelScore:
     """Deeel score for an already-built Lunch (used by the UI for every sort mode)."""
-    sep = sum(_effective_price(i, prefs) for i in (lunch.main, lunch.snack, lunch.drink))
+    sep = _separate_price((lunch.main, lunch.snack, lunch.drink), prefs)
     return deeel_score(lunch.main, lunch.snack, lunch.drink, lunch.price_gbp, sep)
 
 
@@ -288,7 +305,7 @@ def _shortlist(items: list[Item], prefs: Preferences) -> list[Item]:
         return items
     picks: dict[str, Item] = {}
     rankings = [
-        sorted(items, key=lambda i: _effective_price(i, prefs)),
+        sorted(items, key=lambda i: _price_or_inf(i, prefs)),
         sorted(items, key=lambda i: -ingredient_score(i)[0]),
         sorted(items, key=lambda i: -(i.protein_g or 0)),
     ]
@@ -302,13 +319,13 @@ def _deeel_lunch(shop, main, snack, drink, deal, prefs) -> Optional[Lunch]:
     """Build a Lunch for this trio at its cheapest price, or None if over the cap/limits."""
     if _has_nutrition_limit(prefs) and not _meal_nutrition_ok(main, snack, drink, prefs):
         return None
-    sep = _effective_price(main, prefs) + _effective_price(snack, prefs) + _effective_price(drink, prefs)
+    sep = _separate_price((main, snack, drink), prefs)
     price, used_deal, deal_obj = sep, False, None
     if deal is not None and main.meal_deal_eligible and snack.meal_deal_eligible and drink.meal_deal_eligible:
         dp = _deal_price(deal, prefs)
-        if dp < sep:
+        if sep is None or dp < sep:
             price, used_deal, deal_obj = dp, True, deal
-    if price > (prefs.max_price_gbp or P_MAX_DEFAULT):
+    if price is None or price > (prefs.max_price_gbp or P_MAX_DEFAULT):
         return None
     return Lunch(
         shop=shop, main=main, snack=snack, drink=drink,
@@ -373,18 +390,13 @@ def best_lunch_for_shop(
         return w_q * q + w_h * h
 
     key = lambda i: _item_score(i, prefs)
-    trio = _best_trio(mains, snacks, drinks, prefs, key)
-    if trio is None:
-        return None
-    best_main, best_snack, best_drink = trio
+    # Separate mode can only use items with their own price (deal-only items excluded)
+    p_mains, p_snacks, p_drinks = _priced(mains, prefs), _priced(snacks, prefs), _priced(drinks, prefs)
+    trio = _best_trio(p_mains, p_snacks, p_drinks, prefs, key) if p_mains and p_snacks and p_drinks else None
+    sep_price = _separate_price(trio, prefs) if trio else None
 
-    sep_price = (
-        _effective_price(best_main, prefs)
-        + _effective_price(best_snack, prefs)
-        + _effective_price(best_drink, prefs)
-    )
-
-    if sep_price <= p_max:
+    if trio is not None and sep_price <= p_max:
+        best_main, best_snack, best_drink = trio
         sep_score = score_lunch(best_main, best_snack, best_drink, sep_price, prefs)
         best = Lunch(
             shop=shop,
@@ -506,30 +518,36 @@ def top_lunches_for_shop(
     ranked_mains = sorted(mains, key=_item_score, reverse=True)
     results: list[Lunch] = []
 
-    for main in ranked_mains:
-        if len(results) == n:
-            break
-        sides = _best_sides(main, snacks, drinks, prefs, _item_score)
-        if sides is None:
-            continue
-        best_snack, best_drink = sides
-        sep_price = (
-            _effective_price(main, prefs)
-            + _effective_price(best_snack, prefs)
-            + _effective_price(best_drink, prefs)
-        )
-        if sep_price > p_max:
-            continue
-
-        used_deal = False
-        price = sep_price
-        deal_obj = None
-
+    def _priced_lunch(main, best_snack, best_drink):
+        """(price, used_deal, deal) for this trio, or None if it can't be bought within the cap."""
+        sep_price = _separate_price((main, best_snack, best_drink), prefs)
+        price, used_deal, deal_obj = sep_price, False, None
         if shop_deals and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
             d = shop_deals[0]
             dp = d.loyalty_price_gbp if (prefs.has_clubcard or prefs.has_nectar) and d.loyalty_price_gbp else d.price_gbp
-            if dp < sep_price and dp <= p_max:
+            if (sep_price is None or dp < sep_price) and dp <= p_max:
                 price, used_deal, deal_obj = dp, True, d
+        return None if price is None or price > p_max else (price, used_deal, deal_obj)
+
+    deal_snacks = [i for i in snacks if i.meal_deal_eligible]
+    deal_drinks = [i for i in drinks if i.meal_deal_eligible]
+
+    for main in ranked_mains:
+        if len(results) == n:
+            break
+        # Best sides overall; if that trio can't be priced (e.g. a deal-only side
+        # with a main outside the deal), fall back to deal-eligible sides
+        priced = None
+        for pool_s, pool_d in ((snacks, drinks), (deal_snacks, deal_drinks)):
+            if not pool_s or not pool_d:
+                continue
+            sides = _best_sides(main, pool_s, pool_d, prefs, _item_score)
+            if sides and (priced := _priced_lunch(main, *sides)):
+                best_snack, best_drink = sides
+                break
+        if not priced:
+            continue
+        price, used_deal, deal_obj = priced
 
         results.append(Lunch(
             shop=shop,
