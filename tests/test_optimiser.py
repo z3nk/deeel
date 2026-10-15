@@ -8,7 +8,7 @@ from datetime import date
 import pytest
 
 from models import Deal, Item, Preferences, Shop
-from optimiser import best_lunch_for_shop, get_results, hard_filter, rank_shops, score_lunch
+from optimiser import best_lunch_for_shop, get_results, hard_filter, rank_shops, score_lunch, _deal_price
 
 
 # ---------------------------------------------------------------------------

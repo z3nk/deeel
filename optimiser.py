@@ -45,7 +45,7 @@ WALK_SPEED_MPM = 80.0    # metres per minute (used to convert mins → metres in
 def _row_to_item(row: sqlite3.Row) -> Item:
     d = dict(row)
     d["diet_flags"] = json.loads(d["diet_flags"])
-    d["allergens"] = json.loads(d["allergens"])
+    d["allergens"] = json.loads(d["allergens"]) if d.get("allergens") not in (None, "null") else []
     d["meats"] = None if d.get("meats") is None else json.loads(d["meats"])
     d["external_fields"] = json.loads(d.get("external_fields") or "{}")
     d["meal_deal_eligible"] = (
@@ -241,13 +241,46 @@ def _quality_score(item: Item) -> float:
     return q
 
 
+def _item_qualifies_for_loyalty(item: Item, prefs: Preferences) -> bool:
+    shop = (item.shop_id or "").lower()
+    if "tesco" in shop:
+        return prefs.has_clubcard
+    if "sainsburys" in shop:
+        return prefs.has_nectar
+    if "lidl" in shop:
+        return prefs.has_lidl_plus
+    if "ms" in shop or "marks" in shop:
+        return prefs.has_sparks
+    if "waitrose" in shop:
+        return prefs.has_mywaitrose
+    if "pret" in shop:
+        return prefs.has_club_pret
+    return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
+
+
 def _effective_price(item: Item, prefs: Preferences) -> Optional[float]:
-    """The item's own price (loyalty price if the user has a card). None = deal-only."""
-    if prefs.has_clubcard and item.loyalty_price_gbp is not None:
-        return item.loyalty_price_gbp
-    if prefs.has_nectar and item.loyalty_price_gbp is not None:
+    """The item's own price (loyalty price if the user has that shop's card). None = deal-only."""
+    if item.loyalty_price_gbp is not None and _item_qualifies_for_loyalty(item, prefs):
         return item.loyalty_price_gbp
     return item.price_gbp
+
+
+def _deal_qualifies_for_loyalty(deal: Deal, prefs: Preferences) -> bool:
+    scheme = (deal.loyalty_scheme or "").lower()
+    shop = (deal.shop_id or "").lower()
+    if "clubcard" in scheme or "tesco" in shop:
+        return prefs.has_clubcard
+    if "nectar" in scheme or "sainsburys" in shop:
+        return prefs.has_nectar
+    if "lidl" in scheme or "lidl" in shop:
+        return prefs.has_lidl_plus
+    if "sparks" in scheme or "ms" in shop or "marks" in shop:
+        return prefs.has_sparks
+    if "waitrose" in scheme or "waitrose" in shop:
+        return prefs.has_mywaitrose
+    if "pret" in scheme or "pret" in shop:
+        return prefs.has_club_pret
+    return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
 
 
 def _separate_price(items, prefs: Preferences) -> Optional[float]:
@@ -314,7 +347,7 @@ def shop_deal(deals: list[Deal], shop_id: str) -> Optional[Deal]:
 
 
 def _deal_price(deal: Deal, prefs: Preferences) -> float:
-    if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp:
+    if deal.loyalty_price_gbp and _deal_qualifies_for_loyalty(deal, prefs):
         return deal.loyalty_price_gbp
     return deal.price_gbp
 
@@ -441,9 +474,7 @@ def best_lunch_for_shop(
     deal = shop_deal(deals, shop.shop_id)
     if deal is not None:
         deal_price = (
-            deal.loyalty_price_gbp
-            if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp
-            else deal.price_gbp
+            _deal_price(deal, prefs)
         )
 
         deal_mains  = [i for i in mains  if i.meal_deal_eligible]
@@ -552,7 +583,7 @@ def top_lunches_for_shop(
         price, used_deal, deal_obj = sep_price, False, None
         if the_deal and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
             d = the_deal
-            dp = d.loyalty_price_gbp if (prefs.has_clubcard or prefs.has_nectar) and d.loyalty_price_gbp else d.price_gbp
+            dp = _deal_price(d, prefs)
             if (sep_price is None or dp < sep_price) and dp <= p_max:
                 price, used_deal, deal_obj = dp, True, d
         return None if price is None or price > p_max else (price, used_deal, deal_obj)

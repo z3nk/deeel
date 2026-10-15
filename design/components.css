@@ -200,3 +200,7 @@
   font-family: var(--font-ui);
 }
 [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within { border-color: var(--primary); }
+
+/* Hide Streamlit's hover "link to heading" buttons */
+[data-testid="stHeaderActionElements"], .stHeadingWithActionElements a,
+a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }

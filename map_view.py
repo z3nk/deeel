@@ -110,6 +110,7 @@ def build_map(
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
                 f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}"
             )
+            marker_tooltip = f"#{rank} {shop.name}"
         else:
             colour = COLOUR_GREY
             popup_html = (
@@ -117,6 +118,7 @@ def build_map(
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"<i>Outside your filters</i>"
             )
+            marker_tooltip = shop.name
 
         folium.CircleMarker(
             location=[shop.lat, shop.lng],
@@ -124,7 +126,7 @@ def build_map(
             color=colour,
             fill=True,
             fill_color=colour,
-            fill_opacity=0.85,
+            fill_opacity=0.9,
             weight=2,
             popup=folium.Popup(popup_html, max_width=220),
             tooltip=shop.name + (" (sample data)" if shop.shop_id in ranked_index
@@ -136,6 +138,8 @@ def build_map(
             rank, _ = ranked_index[shop.shop_id]
             folium.Marker(
                 location=[shop.lat, shop.lng],
+                popup=folium.Popup(popup_html, max_width=240),
+                tooltip=marker_tooltip,
                 icon=folium.DivIcon(
                     html=f'<div style="{type_css("caption")};font-weight:700;color:{token("rank-ink")};'
                          f'text-align:center;line-height:24px;">{rank}</div>',

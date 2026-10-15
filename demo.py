@@ -24,6 +24,12 @@ DEMO_PREFS = Preferences(
     temperature_pref="any",
     max_price_gbp=6.0,
     max_walking_minutes=10.0,
+    has_clubcard=True,
+    has_nectar=True,
+    has_lidl_plus=True,
+    has_sparks=True,
+    has_mywaitrose=True,
+    has_club_pret=True,
 )
 
 _STEPS = [
@@ -231,7 +237,7 @@ def _step_photo(data, render_card) -> None:
             ]
             for label, val in rows:
                 st.markdown(f"**{label}:** {val}")
-    st.info("Credits are paid **only when our team approves** your photo. Pending photos earn 0 until then.")
+    st.info("Credits are paid **only when your photo is approved**. Pending photos earn 0 until then.")
     st.caption("Spend credits on rewards under **My credits**.")
 
 

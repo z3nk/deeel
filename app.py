@@ -11,6 +11,7 @@ Screens:
 
 from __future__ import annotations
 
+import html
 import json
 import re
 from html import escape
@@ -60,6 +61,7 @@ from optimiser import (
 
 UPLOAD_DIR = UPLOAD_ROOT
 UPLOAD_DIR.mkdir(exist_ok=True)
+# Map popup uses native button to navigate parent
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -186,9 +188,14 @@ def _copy_quick_allergies() -> None:
 
 def _apply_pending_resets() -> None:
     """Clear filter widgets requested by result-page buttons, before the widgets render."""
+    if st.session_state.pop("_clear_allergy_pending", False):
+        # Only from buttons that explicitly say "Clear … allergy filters"
+        st.session_state[ALLERGY_KEY] = []
+        st.session_state[ALLERGY_QUICK_KEY] = []
     if st.session_state.pop("_clear_diet_pending", False):
         st.session_state[DIET_KEY] = []
         st.session_state["meats_allowed"] = []
+        st.session_state["temp_pref"] = "any"
     if st.session_state.pop("_clear_nutrition_pending", False):
         st.session_state["min_protein"] = 0
         st.session_state["max_kcal"] = KCAL_CAP
@@ -200,7 +207,7 @@ def render_sidebar() -> Preferences:
 
     # Username
     st.sidebar.text_input(
-        "Your name (for credits)",
+        "Username",
         key="username",
         placeholder="e.g. Alex",
     )
@@ -259,18 +266,29 @@ def render_sidebar() -> Preferences:
     # Preferences
     st.sidebar.markdown("**Preferences**")
     max_price = st.sidebar.slider("Max price (£)", 2.0, 14.0, 6.0, step=0.25)
-    walk_limit = st.sidebar.slider("Walking limit", 2, 30, 10, format="%d min")
+    if "walk_limit_override" in st.session_state:
+        st.session_state["walk_limit"] = st.session_state.pop("walk_limit_override")
+    st.session_state.setdefault("walk_limit", 10)
+    walk_limit = st.sidebar.slider("Walking limit", 2, 30, format="%d min", key="walk_limit")
+    # Horizontal radio (not segmented_control: Streamlit's AppTest can't drive single-select
+    # segmented controls, which would break the app-level tests)
     temp = st.sidebar.radio(
         "Hot or cold main",
         options=["any", "hot", "cold"],
+        format_func=str.capitalize,
         horizontal=True,
         key="temp_pref",
     )
     st.sidebar.divider()
 
-    # Loyalty
+    # Loyalty cards
     st.sidebar.markdown("**Loyalty cards**")
-    loyalty = st.sidebar.toggle("I have loyalty cards (Clubcard / Nectar)", value=False)
+    has_clubcard = st.sidebar.checkbox("Tesco Clubcard", value=True, key="card_clubcard")
+    has_nectar = st.sidebar.checkbox("Sainsbury's Nectar", value=True, key="card_nectar")
+    has_lidl_plus = st.sidebar.checkbox("Lidl Plus", value=True, key="card_lidl_plus")
+    has_sparks = st.sidebar.checkbox("M&S Sparks", value=True, key="card_sparks")
+    has_mywaitrose = st.sidebar.checkbox("myWaitrose", value=True, key="card_mywaitrose")
+    has_club_pret = st.sidebar.checkbox("Club Pret", value=True, key="card_club_pret")
     st.sidebar.divider()
 
     # Sort
@@ -291,8 +309,12 @@ def render_sidebar() -> Preferences:
         meats_allowed=[m.lower() for m in meats],
         min_protein_g=float(min_protein) if min_protein else None,
         max_kcal=float(max_kcal) if max_kcal < KCAL_CAP else None,
-        has_clubcard=loyalty,
-        has_nectar=loyalty,
+        has_clubcard=has_clubcard,
+        has_nectar=has_nectar,
+        has_lidl_plus=has_lidl_plus,
+        has_sparks=has_sparks,
+        has_mywaitrose=has_mywaitrose,
+        has_club_pret=has_club_pret,
     )
 
 
@@ -567,9 +589,27 @@ def screen_find(prefs: Preferences):
                     st.session_state["walk_limit_override"] = 15
                     st.rerun()
             elif not any(i.category == "main" for i in filtered):
-                st.warning("No mains match your filters.")
-                if st.button("Clear diet filters", key="relax_diet"):
-                    st.session_state["_clear_diet_pending"] = True
+                has_diet = any(prefs.diet_flags) or bool(prefs.meats_allowed)
+                has_allergy = bool(prefs.allergens_exclude)
+                if has_diet and has_allergy:
+                    msg = "No mains match your diet and allergy filters."
+                    btn_text = "Clear diet & allergy filters"
+                elif has_allergy:
+                    msg = "No mains match your allergy filters."
+                    btn_text = "Clear allergy filters"
+                else:
+                    msg = "No mains match your diet filters."
+                    btn_text = "Clear diet filters"
+                st.warning(msg)
+                if st.button(btn_text, key="relax_diet"):
+                    # Each button clears exactly what its label says
+                    st.session_state["_clear_diet_pending"] = has_diet or not has_allergy
+                    st.session_state["_clear_allergy_pending"] = has_allergy
+                    st.rerun()
+            elif not any(i.category == "snack" for i in filtered) or not any(i.category == "drink" for i in filtered):
+                st.warning("No snacks or drinks match your allergy filters.")
+                if st.button("Clear allergy filters", key="relax_snack_drink"):
+                    st.session_state["_clear_allergy_pending"] = True
                     st.rerun()
             elif prefs.min_protein_g is not None or prefs.max_kcal is not None:
                 st.warning("No meal near you fits your protein / calorie limits.")
@@ -577,8 +617,12 @@ def screen_find(prefs: Preferences):
                     st.session_state["_clear_nutrition_pending"] = True
                     st.rerun()
             else:
-                st.info("Set your preferences on the left to find the best lunch near you.")
-                st.caption("Pick a budget and walking limit — results appear instantly.")
+                st.warning("No meal combinations match your budget or preferences.")
+                # Allergy filters are never cleared by a button that doesn't name them
+                if st.button("Clear diet & nutrition filters", key="relax_all"):
+                    st.session_state["_clear_diet_pending"] = True
+                    st.session_state["_clear_nutrition_pending"] = True
+                    st.rerun()
             return
 
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
@@ -629,12 +673,80 @@ def screen_find(prefs: Preferences):
 
     with map_tab:
         all_ranked = [primary] + alternatives + other_shops if primary else []
+        for l in all_ranked:
+            st.session_state[f"why_{l.shop.shop_id}"] = l.why or ""
         fmap = build_map(
             ranked_lunches=all_ranked,
             all_shops=shops,
             walking_limit_minutes=prefs.max_walking_minutes,
         )
-        st_folium(fmap, width=900, height=500, returned_objects=[])
+        map_data = st_folium(
+            fmap,
+            width=900,
+            height=500,
+            returned_objects=["last_object_clicked", "last_object_clicked_tooltip"],
+        )
+
+        # Detect clicked shop on map
+        selected_shop_id = st.session_state.get("map_selected_shop_id")
+        if map_data:
+            clicked_obj = map_data.get("last_object_clicked")
+            clicked_tooltip = map_data.get("last_object_clicked_tooltip") or ""
+            if clicked_obj and isinstance(clicked_obj, dict):
+                clat = clicked_obj.get("lat")
+                clng = clicked_obj.get("lng")
+                if clat is not None and clng is not None:
+                    match = next(
+                        (s for s in shops if abs(s.lat - clat) < 0.0003 and abs(s.lng - clng) < 0.0003),
+                        None,
+                    )
+                    if match:
+                        selected_shop_id = match.shop_id
+                        st.session_state["map_selected_shop_id"] = match.shop_id
+            if not selected_shop_id and clicked_tooltip:
+                match = next((s for s in shops if s.name in clicked_tooltip), None)
+                if match:
+                    selected_shop_id = match.shop_id
+                    st.session_state["map_selected_shop_id"] = match.shop_id
+
+        # Fallback to primary shop if nothing selected yet
+        if not selected_shop_id and primary:
+            selected_shop_id = primary.shop.shop_id
+            st.session_state["map_selected_shop_id"] = selected_shop_id
+
+        if selected_shop_id:
+            sel_shop = next((s for s in shops if s.shop_id == selected_shop_id), None)
+            sel_lunch = next((l for l in all_ranked if l.shop.shop_id == selected_shop_id), None)
+            if sel_shop:
+                st.markdown("---")
+                with st.container(border=True):
+                    mcol1, mcol2, mcol3 = st.columns([3, 2, 1])
+                    with mcol1:
+                        rank_prefix = ""
+                        if sel_lunch:
+                            sel_rank = next((i + 1 for i, l in enumerate(all_ranked) if l.shop.shop_id == selected_shop_id), 0)
+                            rank_prefix = f"#{sel_rank} " if sel_rank > 0 else ""
+                        st.markdown(
+                            f"{logo_html(sel_shop)}<b>{rank_prefix}{sel_shop.name}</b>",
+                            unsafe_allow_html=True,
+                        )
+                        st.caption(f"{sel_shop.walking_minutes:.0f} min walk")
+                        if sel_lunch:
+                            st.markdown(f"{sel_lunch.main.name} + {sel_lunch.snack.name} + {sel_lunch.drink.name}")
+                        else:
+                            st.caption("Outside your active filters")
+                    with mcol2:
+                        if sel_lunch:
+                            st.markdown(f"### £{sel_lunch.price_gbp:.2f}")
+                            deal_str = "Meal deal" if sel_lunch.used_deal else "Bought separately"
+                            st.caption(f"✅ {deal_str}")
+                    with mcol3:
+                        if st.button("See basket →", key=f"map_see_basket_{sel_shop.shop_id}"):
+                            st.session_state["detail_shop_id"] = sel_shop.shop_id
+                            if sel_lunch:
+                                st.session_state[f"why_{sel_shop.shop_id}"] = sel_lunch.why or ""
+                            st.session_state["screen"] = "detail"
+                            st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -1104,12 +1216,12 @@ def screen_upload():
     st.info(
         "Pick the shop and what's in the photo, then upload one or many photos. "
         "One photo can cover a whole shelf — we'll pick out every product. "
-        "Credits are paid once our team approves each product."
+        "Credits are paid once your photo is approved."
     )
 
     user_id = _ensure_user()
     if not user_id:
-        st.warning("Enter your name in the sidebar to earn credits.")
+        st.warning("Enter your username in the sidebar to earn credits.")
 
     conn = _conn()
     shops_list = _load_data()[0]
@@ -1252,7 +1364,7 @@ def screen_credits():
     _heading(1, "My credits")
     user_id = _ensure_user()
     if not user_id:
-        st.info("Enter your name in the sidebar to see your credits.")
+        st.info("Enter your username in the sidebar to see your credits.")
         return
 
     conn = _conn()
@@ -1506,7 +1618,17 @@ SCREENS = {
 ADMIN_SCREENS = {"Review queue": "review"}
 
 
+
+
 def main():
+
+    # Direct navigation from URL query param (e.g. from map popup "See basket →" link)
+    shop_param = st.query_params.get("shop")
+    if shop_param:
+        del st.query_params["shop"]
+        st.session_state["detail_shop_id"] = shop_param
+        st.session_state["screen"] = "detail"
+
     prefs = render_sidebar()
     render_admin_sidebar()
 
