@@ -34,6 +34,7 @@ from db import (
 )
 from extract import extract_item, extract_deal, strip_exif
 from map_view import build_map
+from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
     get_results,
@@ -99,7 +100,7 @@ def _ensure_user():
 # ---------------------------------------------------------------------------
 
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
-DIETS     = ["Vegetarian", "Vegan", "Halal"]
+DIETS     = ["Vegetarian", "Vegan", "Halal", "Kosher"]
 MEATS     = ["No meat", "Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
 
@@ -140,8 +141,9 @@ def render_sidebar() -> Preferences:
     # Diet
     st.sidebar.markdown("**Diet**")
     diet_flags = [d for d in DIETS if st.sidebar.checkbox(d, key=f"diet_{d}")]
-    if "Halal" in diet_flags:
-        st.sidebar.caption("Only mains with a printed halal label are shown.")
+    certified = [d.lower() for d in diet_flags if d in ("Halal", "Kosher")]
+    if certified:
+        st.sidebar.caption(f"Only mains with a printed {' / '.join(certified)} label are shown.")
     meats = st.sidebar.multiselect(
         "Meat in main",
         MEATS,
@@ -256,7 +258,10 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         with col1:
             rank_str = f"#{rank} " if rank > 0 else ""
             badge = ' <span style="background:#0F7B5F;color:white;font-size:10px;padding:2px 8px;border-radius:999px">Best match</span>' if featured else ""
-            st.markdown(f"**{rank_str}{lunch.shop.name}**{badge}", unsafe_allow_html=True)
+            st.markdown(
+                f"{logo_html(lunch.shop)}<b>{rank_str}{lunch.shop.name}</b>{badge}",
+                unsafe_allow_html=True,
+            )
             st.caption(f"{lunch.shop.walking_minutes:.0f} min walk")
             st.markdown(
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}"
@@ -375,7 +380,7 @@ def screen_find(prefs: Preferences):
                     st.markdown(
                         f'<div style="opacity:0.4;border:1px solid #E3E3DE;border-radius:8px;'
                         f'padding:12px;margin-bottom:8px">'
-                        f'<b>{shop.name}</b> · {shop.walking_minutes:.0f} min walk · '
+                        f'{logo_html(shop, size=20)}<b>{shop.name}</b> · {shop.walking_minutes:.0f} min walk · '
                         f'<span style="color:#94A3B8">Data too old</span></div>',
                         unsafe_allow_html=True,
                     )
@@ -412,7 +417,10 @@ def screen_detail():
         st.session_state["screen"] = "find"
         st.rerun()
 
-    st.markdown(f"## {shop.name}")
+    photo = storefront_path(shop)
+    if photo is not None:
+        st.image(str(photo))
+    st.markdown(f"<h2>{logo_html(shop, size=40)}{shop.name}</h2>", unsafe_allow_html=True)
     # Pull the why from the last ranked result for this shop if available
     why_text = st.session_state.get(f"why_{shop_id}", "")
     sub = f"{shop.walking_minutes:.0f} min walk from campus"

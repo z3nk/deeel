@@ -306,3 +306,28 @@ class TestAlternativesFiltered:
         primary, alts, _ = get_results([SHOP_A], items, [], Preferences(allergens_exclude=["nuts"]), today=TODAY)
         assert primary.main.item_id == "safe"
         assert all(l.main.item_id != "nutty" for l in alts)
+
+
+# ---------------------------------------------------------------------------
+# Shop images
+# ---------------------------------------------------------------------------
+
+class TestShopImages:
+    def test_badge_fallback_for_every_chain(self, tmp_path, monkeypatch):
+        import shop_images
+        monkeypatch.setattr(shop_images, "LOGO_DIR", tmp_path)
+        for chain in ("tesco", "sainsburys", "waitrose", "marks-and-spencer", "lidl", "pret"):
+            shop = SHOP_A.model_copy(update={"chain": chain})
+            assert shop_images.logo_html(shop).startswith("<svg")
+
+    def test_logo_file_used_when_present(self, tmp_path, monkeypatch):
+        import shop_images
+        (tmp_path / "tesco.png").write_bytes(b"\x89PNG fake")
+        monkeypatch.setattr(shop_images, "LOGO_DIR", tmp_path)
+        assert 'src="data:image/png;base64,' in shop_images.logo_html(SHOP_A)
+
+    def test_kosher_is_a_label_only_diet_flag(self):
+        plain = _item("plain", "shop-a", "main", 2.00)
+        kosher = _item("k", "shop-a", "main", 2.00, diet_flags=["Kosher"])
+        result = hard_filter([plain, kosher], Preferences(diet_flags=["kosher"]), today=TODAY)
+        assert [i.item_id for i in result] == ["k"]

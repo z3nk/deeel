@@ -86,7 +86,8 @@ CRITICAL RULES — read carefully:
 2. allergens: list ONLY allergens explicitly named on the label
    (e.g. "Contains: milk, wheat"). If unreadable or absent, return [].
 3. NEVER infer, guess, or assume diet or allergen status from the product name.
-   "Halal" goes in diet_flags only if a halal mark or the word "Halal" is printed.
+   "Halal" / "Kosher" go in diet_flags only if that certification mark or word
+   is printed on the label.
 3a. meats: lowercase list from chicken, beef, pork, lamb, turkey, duck, fish
    (ham/bacon/chorizo = pork; tuna/salmon/prawn = fish), taken from the product
    name or printed ingredients. Return [] only if the label says vegetarian/vegan

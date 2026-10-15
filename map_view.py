@@ -16,6 +16,7 @@ import folium
 
 from models import Lunch, Shop
 from optimiser import WALK_SPEED_MPM
+from shop_images import logo_html
 
 # UCL Main Quad, Gower Street
 CAMPUS_LAT = 51.5246
@@ -101,7 +102,7 @@ def build_map(
             colour = _rank_colour(rank)
             deal_label = "Meal deal" if lunch.used_deal else "Separate"
             popup_html = (
-                f"<b>#{rank} {shop.name}</b><br>"
+                f"{logo_html(shop, size=22)}<b>#{rank} {shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
                 f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}"
@@ -109,7 +110,7 @@ def build_map(
         else:
             colour = COLOUR_GREY
             popup_html = (
-                f"<b>{shop.name}</b><br>"
+                f"{logo_html(shop, size=22)}<b>{shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"<i>Outside your filters</i>"
             )
