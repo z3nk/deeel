@@ -39,11 +39,9 @@ _STEPS = [
 
 
 def _chip(text: str) -> str:
-    return (
-        f'<span class="dl-type-label" style="display:inline-block;background:var(--primary-tint);color:var(--primary);'
-        f'padding:var(--space-1) var(--space-3);border-radius:var(--radius-chip);'
-        f'margin:0 var(--space-2) var(--space-2) 0">{text}</span>'
-    )
+    """A selected preference, styled as an active DietChip (.dl-chip--diet.is-on)."""
+    return (f'<span class="dl-chip dl-chip--diet is-on" '
+            f'style="margin:0 var(--space-2) var(--space-2) 0">✓ {text}</span>')
 
 
 # Navigation uses on_click callbacks: they update state before the next run,
@@ -160,11 +158,13 @@ def _step_filters(data, render_card) -> None:
         with st.container(border=True):
             st.caption(label)
             st.markdown(_summary(primary), unsafe_allow_html=True)
-    st.info(
-        "Diet, halal and kosher come **only from printed label text**. Allergens are read by computer "
-        "from labels, with gaps filled from Open Food Facts by barcode — but only printed-label allergens "
-        "can clear an item for an allergy filter; unknown means unsafe. "
-        "**Allergen info can be wrong — always check the packaging.**"
+    # Serious mode: the allergy explanation uses the AllergyWarning box, not a generic info box
+    st.markdown(
+        '<div class="dl-box dl-box--allergy">Diet, halal and kosher come <strong>only from printed label '
+        "text</strong>. Allergens are read by computer from labels, with gaps filled from Open Food Facts by "
+        "barcode — but only printed-label allergens can clear an item for an allergy filter; unknown means "
+        "unsafe. <strong>Allergen info can be wrong — always check the packaging.</strong></div>",
+        unsafe_allow_html=True,
     )
 
 
