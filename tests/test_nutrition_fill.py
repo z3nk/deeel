@@ -195,3 +195,28 @@ def test_fill_existing_fills_allergens_in_db(conn):
     row = conn.execute("SELECT allergens, external_fields FROM items WHERE item_id=?", (item_id,)).fetchone()
     assert json.loads(row["allergens"]) == ["milk"]
     assert json.loads(row["external_fields"])["allergens"] == openfoodfacts.SOURCE
+
+
+
+def test_name_match_rejects_the_real_mistakes_seen():
+    from openfoodfacts import best_name_match
+    cherry_zero = {"brands": "Coca-Cola", "product_name": "Coca Cola Cherry Zero Bottle 500ml", "quantity": "500 ml"}
+    cherry = {"brands": "Coca-Cola", "product_name": "Coca-Cola Cherry", "quantity": "500 ml"}
+    assert best_name_match("Coca-Cola Cherry 500ml", [cherry_zero]) is None          # variant word
+    assert best_name_match("Coca-Cola Cherry 500ml", [cherry_zero, cherry]) is cherry
+    ginsters = {"brands": "Ginsters", "product_name": "Cornish Pasty Original"}
+    assert best_name_match("Cornish Pasty", [ginsters]) is None                        # no brand in common
+    tesco_wrap = {"brands": "Tesco", "product_name": "Chicken Caesar Wrap"}
+    assert best_name_match("Chicken Caesar Wrap", [tesco_wrap]) is None                # another shop's own brand
+    assert best_name_match("Tesco Chicken Caesar Wrap", [tesco_wrap]) is tesco_wrap
+    trek = {"brands": "TREK", "product_name": "Protein Flapjack White Choc &amp; Raspberry"}
+    assert best_name_match("Trek Protein Flapjack White Choc & Raspberry", [trek]) is trek
+
+
+def test_match_label_unescapes_html():
+    from openfoodfacts import search_by_name
+    trek = {"brands": "TREK", "product_name": "Protein Flapjack White Choc &amp; Raspberry",
+            "ingredients_text": "Oats, soy protein"}
+    with patch("openfoodfacts._search", return_value=[trek]):
+        _, label = search_by_name("Trek Protein Flapjack White Choc & Raspberry")
+    assert label == "TREK Protein Flapjack White Choc & Raspberry"

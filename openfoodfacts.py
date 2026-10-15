@@ -21,6 +21,7 @@ Rules:
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import time
@@ -136,6 +137,11 @@ MIN_NAME_OVERLAP = 0.75          # share of our name's words that must appear in
 MIN_NAME_WORDS = 2               # one-word names ("Oasis") are too ambiguous to match
 
 _STOPWORDS = {"and", "with", "the", "of", "in", "a", "on", "for", "by", "sandwich", "pack"}
+# Words that make a different product: if the match has one and we don't, it's not ours
+_VARIANT_WORDS = {"zero", "diet", "light", "lite", "max", "free", "sugarfree", "decaf", "mini", "minis",
+                  "vegan", "vegetarian", "veggie", "protein", "lowfat", "reduced", "skinny", "kids"}
+_SUPERMARKETS = {"tesco", "sainsburys", "waitrose", "marks", "spencer", "ms", "lidl", "aldi", "asda",
+                 "morrisons", "coop", "co", "op", "iceland", "ocado"}
 _SIZE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(ml|g|kg|l|cl)\b", re.IGNORECASE)
 _last_search = 0.0
 _search_cache: dict[str, list[dict]] = {}
@@ -159,14 +165,24 @@ def best_name_match(our_name: str, candidates: list[dict]) -> dict | None:
         return None
     our_size = name_size(our_name)
 
+    def acceptable(product: dict) -> bool:
+        brand = name_words(product.get("brands") or "")
+        theirs = brand | name_words(product.get("product_name") or "")
+        if len(ours & theirs) / len(ours) < MIN_NAME_OVERLAP:
+            return False
+        if (theirs - ours) & _VARIANT_WORDS:            # e.g. "Cherry Zero" for our "Cherry"
+            return False
+        if (brand & _SUPERMARKETS) - ours:              # another shop's own brand
+            return False
+        # A brand in common, or a long name that matches completely
+        return bool(brand & ours) or (len(ours) >= 3 and ours <= theirs)
+
     def score(product: dict) -> tuple[float, int]:
         theirs = name_words(f"{product.get('brands') or ''} {product.get('product_name') or ''}")
-        overlap = len(ours & theirs) / len(ours)
         same_size = int(our_size is not None and pack_quantity(product) == our_size)
-        return overlap, same_size
+        return len(ours & theirs) / len(ours), same_size
 
-    scored = [(score(p), p) for p in candidates if p.get("product_name")]
-    good = [(s, p) for s, p in scored if s[0] >= MIN_NAME_OVERLAP]
+    good = [(score(p), p) for p in candidates if p.get("product_name") and acceptable(p)]
     return max(good, key=lambda sp: sp[0])[1] if good else None
 
 
@@ -208,5 +224,6 @@ def search_by_name(name: str) -> tuple[dict, str] | None:
     if our_size is not None and pack_quantity(match) != our_size:
         values.pop("kcal", None)
         values.pop("protein_g", None)
-    label = " ".join(x for x in (match.get("brands", "").split(",")[0].strip(), match.get("product_name", "")) if x)
+    label = html.unescape(" ".join(
+        x for x in ((match.get("brands") or "").split(",")[0].strip(), match.get("product_name") or "") if x))
     return (values, label) if values else None
