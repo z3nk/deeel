@@ -107,7 +107,7 @@ def _step_results(data, render_card) -> None:
     if alternatives:
         st.caption(f"Section B — other mains at {primary.shop.name}")
         for i, alt in enumerate(alternatives, start=2):
-            render_card(alt, rank=i, prefs=DEMO_PREFS, key_prefix="demo_")
+            render_card(alt, rank=i, prefs=DEMO_PREFS, key_prefix="demo_", show_rank=False)
     if other_shops:
         st.caption("Section C — the best lunch at other nearby shops")
         for i, lunch in enumerate(other_shops, start=len(alternatives) + 2):

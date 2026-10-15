@@ -250,7 +250,7 @@ _SEED_REWARDS = [
     },
     {
         "reward_id": "reward-lunch",
-        "sponsor": "UCL Union (placeholder)",
+        "sponsor": "Campus partner (placeholder)",   # no university branding (design rules)
         "title": "£1 off your next lunch",
         "cost_credits": 30,
         "codes_remaining": 20,
@@ -430,10 +430,12 @@ def _seed_shops(conn: sqlite3.Connection) -> None:
 def _seed_rewards(conn: sqlite3.Connection) -> None:
     conn.executemany(
         """
-        INSERT OR IGNORE INTO rewards
+        INSERT INTO rewards
             (reward_id, sponsor, title, cost_credits, codes_remaining, expires)
         VALUES
             (:reward_id, :sponsor, :title, :cost_credits, :codes_remaining, :expires)
+        ON CONFLICT(reward_id) DO UPDATE SET sponsor = excluded.sponsor, title = excluded.title,
+            cost_credits = excluded.cost_credits, expires = excluded.expires
         """,
         _SEED_REWARDS,
     )

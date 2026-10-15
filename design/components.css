@@ -174,3 +174,29 @@
 /* Review queue record line */
 .dl-record { font-family: var(--font-ui); font-size: 14px; line-height: 20px; color: var(--text); }
 .dl-record__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+
+/* ── Phone layout fixes (Streamlit stacks st.columns below 640px) ───────────── */
+@media (max-width: 640px) {
+  /* Top nav and result-card actions stay on one compact row */
+  .st-key-dl_nav [data-testid="stHorizontalBlock"],
+  [class*="dl_card_actions"] [data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important; gap: var(--space-2) !important;
+  }
+  .st-key-dl_nav [data-testid="stColumn"],
+  [class*="dl_card_actions"] [data-testid="stColumn"] {
+    min-width: 0 !important; width: auto !important; flex: 1 1 0 !important;
+  }
+  .st-key-dl_nav [data-testid="stColumn"]:last-child { flex: 0 0 40px !important; }
+  .st-key-dl_nav button { min-height: 36px; padding: var(--space-1) var(--space-1); }
+  .st-key-dl_nav button p { font-size: 12px; line-height: 14px; white-space: normal; }
+}
+/* Result-card actions: popover left, "See basket →" right as a primary-coloured link */
+[class*="dl_card_actions"] [data-testid="stColumn"]:last-child { display: flex; justify-content: flex-end; }
+[class*="dl_card_actions"] button[kind="tertiary"] p { color: var(--primary); font-weight: 600; }
+
+/* Selectboxes (shop-page pickers): token borders, radius and type */
+[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+  border-radius: var(--radius-button); border-color: var(--border-strong);
+  font-family: var(--font-ui);
+}
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within { border-color: var(--primary); }

@@ -355,7 +355,7 @@ def _allergen_line(items_list, avoid: list[str]) -> str:
     all_allergens = sorted({a for i in items_list for a in i.allergens})
     allergen_str = ", ".join(all_allergens) if all_allergens else "none found on labels"
     if any(not i.allergens for i in items_list):
-        allergen_str += " (some items' allergens unknown)"
+        allergen_str += " (allergens not checked for some items)"
     if any("allergens" in i.external_fields for i in items_list):
         allergen_str += " (partly from Open Food Facts / other photos)"
     return f"Allergens: {allergen_str} · {ALLERGY_WARNING_SHORT}"
@@ -526,12 +526,15 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
     card_cls = "dl-card dl-card--in-st" + (" dl-card--featured" if featured else "")
     with st.container(border=True):
         st.markdown(f'<div class="{card_cls}">{"".join(body)}</div>', unsafe_allow_html=True)
-        score_col, basket_col = st.columns(2)
-        with score_col.popover("How it's scored", use_container_width=True):
+        # One row on every width (CSS stops Streamlit stacking it on phones); the
+        # basket action is a link-style button, as in the ResultCard spec
+        with st.container(key=f"{key_prefix}dl_card_actions_{lunch.shop.shop_id}_{rank}"):
+            score_col, basket_col = st.columns(2)
+        with score_col.popover("How it's scored"):
             _render_deeel_breakdown(lunch, d)
         with basket_col:
             if st.button("See basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}",
-                         use_container_width=True):
+                         type="tertiary"):
                 st.session_state["detail_shop_id"] = lunch.shop.shop_id
                 st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
                 st.session_state["screen"] = "detail"
@@ -1514,7 +1517,8 @@ def main():
     screens = {**SCREENS, **ADMIN_SCREENS} if is_admin() else SCREENS
 
     # Top nav, with the "?" tour button as a narrow last column (top-right corner)
-    nav_cols = st.columns([1] * len(screens) + [0.25])
+    with st.container(key="dl_nav"):   # compact single row on phones (design/components.css)
+        nav_cols = st.columns([1] * len(screens) + [0.25])
     # The shop page belongs to Find; the active screen's button is the primary one
     current = {"detail": "find"}.get(st.session_state["screen"], st.session_state["screen"])
     for col, (label, key) in zip(nav_cols, screens.items()):
