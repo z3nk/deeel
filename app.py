@@ -35,6 +35,7 @@ from db import (
 from extract import extract_item, extract_deal, strip_exif
 from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
+from ingredients import assess as assess_ingredients
 from map_view import build_map
 from shop_images import logo_html, storefront_path
 from models import Preferences
@@ -275,8 +276,15 @@ def _render_deeel(lunch, prefs: Preferences) -> None:
         for k, weight in DEEEL_WEIGHTS.items():
             pts = weight * d.parts[k]
             st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
+        st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
+                   "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
+                   "The main counts double.")
+        for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
+            a = assess_ingredients(item.ingredients_text)
+            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}")
         if d.partial:
-            st.caption("Some label info is missing (nutrition or ingredients), so those parts score a neutral half.")
+            st.caption("Some label info is missing. Unknown nutrition scores half marks; "
+                       "unknown ingredients score below an average label.")
 
 
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):

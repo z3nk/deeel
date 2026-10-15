@@ -285,19 +285,25 @@ def _init_db(conn: sqlite3.Connection) -> None:
 
 _ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL"}
 
+# Bump when FALLBACK_ITEMS/FALLBACK_* data in seed/load_seed.py changes, so existing
+# databases (including the deployed one) drop and reload their fallback rows.
+FALLBACK_DATA_VERSION = 2
+
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """
     Add columns introduced after a DB was first created.
-    If any were missing, drop fallback seed rows so _auto_seed_items reloads them
+    If any were missing, or the fallback data version changed, drop fallback seed rows so _auto_seed_items reloads them
     with the new fields filled in. Real (photo/upload) records are kept.
     """
     existing = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
     missing = {c: t for c, t in _ITEM_COLUMNS_ADDED.items() if c not in existing}
-    if not missing:
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if not missing and version >= FALLBACK_DATA_VERSION:
         return
     for col, col_type in missing.items():
         conn.execute(f"ALTER TABLE items ADD COLUMN {col} {col_type}")
+    conn.execute(f"PRAGMA user_version = {FALLBACK_DATA_VERSION}")
     conn.execute("DELETE FROM items WHERE source_image = 'fallback.jpg'")
     conn.execute("DELETE FROM deals WHERE source_image = 'fallback.jpg'")
     conn.commit()

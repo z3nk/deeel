@@ -15,7 +15,7 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 - Preferences are set through sidebar controls only: allergen chips, diet chips (incl. Halal, label-only), meat-in-main chips (none picked = any; meat-free = Vegetarian chip), whole-meal min protein / max calories sliders, max price slider, walking limit slider, hot/cold/any toggle, loyalty card toggle, sort dropdown.
 - Meat, kcal and protein come from the label like allergens. Unknown = excluded when that filter is on. Meat and diet filters apply to mains only; nutrition limits are whole-meal totals.
 - Free-text preference input ("cheap, warm, vegetarian") is a stretch feature. Do not build it until after the 1:30 hackathon gate.
-- The sort dropdown (Deeel score / Quality / Distance / Price). Deeel (default) ranks by the 0–100 Deeel score in `deeel.py` (value 30, fillingness 25, ingredient quality 25, nutrition balance 10, deal saving 10; unknown inputs = neutral 0.5) via a shortlisted combination search; the others map to score weights in the optimiser — see PLAN.md.
+- The sort dropdown (Deeel score / Quality / Distance / Price). Deeel (default) ranks by the 0–100 Deeel score in `deeel.py` (value 30, fillingness 25, ingredient quality 25, nutrition balance 10, deal saving 10; unknown nutrition = 0.5, unknown ingredients = 0.4; ingredient quality = processing-marker types + top-level ingredient count in `ingredients.py`, method in readme) via a shortlisted combination search; the others map to score weights in the optimiser — see PLAN.md.
 
 ## Results output
 - Results are shown in three sections: one featured best option (Section A), up to 3 alternatives at the same shop varying the main (Section B), up to 3 other shops (Section C).

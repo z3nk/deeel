@@ -46,7 +46,7 @@ def test_ingredients_penalise_e_numbers():
     additive = _item("a", "shop-a", "main", 3.0).model_copy(
         update={"ingredients_text": "Chicken, bread, E330, E211, E202, E471, E472e, lettuce"})
     assert ingredient_score(clean)[0] > ingredient_score(additive)[0]
-    assert ingredient_score(_item("u", "shop-a", "main", 3.0)) == (0.5, False)
+    assert ingredient_score(_item("u", "shop-a", "main", 3.0)) == (0.4, False)
 
 
 def test_deeel_sort_prefers_filling_value_combo():

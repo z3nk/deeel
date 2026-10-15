@@ -4,18 +4,19 @@ Deeel score: a 0–100 rating for one main + snack + drink combination.
 Weighted sum of factors, each scored 0–1 from label data only:
     value        cheap on a fixed £ scale (comparable across users' price caps)
     filling      total protein + kcal
-    ingredients  printed ingredients (E-numbers, list length), premium range, student ratings
+    ingredients  how processed the items are, from printed ingredients (see ingredients.py)
     balance      share of calories from protein
     deal         % saved by the meal deal versus buying separately
 
-Unknown inputs score a neutral 0.5 and the result is marked partial.
+Unknown nutrition scores a neutral 0.5; unknown ingredients score ingredients.UNKNOWN_SCORE.
+Either way the result is marked partial.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
+from ingredients import assess
 from models import Item
 
 WEIGHTS = {
@@ -40,9 +41,6 @@ PROTEIN_SHARE_FULL = 0.25               # 25% of kcal from protein = full marks
 SAVING_FULL = 0.35                      # 35% off separate price = full marks
 NEUTRAL = 0.5
 
-_E_NUMBER = re.compile(r"\bE ?\d{3}[a-z]?\b", re.IGNORECASE)
-
-
 @dataclass
 class DeeelScore:
     total: int                                   # 0–100, for display
@@ -56,22 +54,9 @@ def _clamp(x: float) -> float:
 
 
 def ingredient_score(item: Item) -> tuple[float, bool]:
-    """(0–1, known) for one item. Label first, then premium flag, then student rating."""
-    known = False
-    if item.ingredients_text:
-        known = True
-        e_numbers = len(_E_NUMBER.findall(item.ingredients_text))
-        n_ingredients = len([p for p in re.split(r"[,;]", item.ingredients_text) if p.strip()])
-        score = 1.0 - 0.6 * _clamp(e_numbers / 5) - 0.4 * _clamp((n_ingredients - 8) / 20)
-    else:
-        score = NEUTRAL
-    if item.premium_range:
-        known = True
-        score = min(1.0, score + 0.15)
-    if item.quality_rating is not None:
-        known = True
-        score = 0.5 * score + 0.5 * (item.quality_rating - 1) / 4
-    return _clamp(score), known
+    """(0–1, known) for one item, from its printed ingredients only."""
+    a = assess(item.ingredients_text)
+    return a.score, a.known
 
 
 def deeel_score(

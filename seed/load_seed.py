@@ -201,6 +201,38 @@ FALLBACK_NUTRITION = {
     "w-snack-1": ([], 300, 9),           "w-drink-1": ([], 0, 0),
 }
 
+# Ingredients for fallback items (placeholder, typical of UK labels) — replaced on the seed walk
+_BREAD = "Bread (Wheat Flour, Water, Yeast, Salt, Emulsifier (E471), Flour Treatment Agent (Ascorbic Acid))"
+_WRAP = "Tortilla Wrap (Wheat Flour, Water, Rapeseed Oil, Raising Agents (E450, E500), Preservative (Calcium Propionate))"
+FALLBACK_INGREDIENTS = {
+    "t-main-1": f"{_WRAP}, Cooked Chicken (22%), Caesar Dressing (Rapeseed Oil, Water, Egg Yolk, Parmesan, Modified Maize Starch, Sugar, Flavouring), Lettuce",
+    "t-main-2": f"{_BREAD}, Ham (Pork, Water, Salt, Dextrose, Stabiliser (E451), Preservative (Sodium Nitrite)), Cheddar Cheese, Butter",
+    "t-main-3": f"{_WRAP}, Falafel (Chickpeas, Onion, Parsley, Cumin), Houmous (Chickpeas, Tahini, Lemon Juice, Garlic), Spinach, Red Pepper",
+    "t-snack-1": "Potatoes, Sunflower Oil, Salt",
+    "t-snack-2": "Pineapple, Melon, Grapes",
+    "t-drink-1": "Carbonated Water, Sugar, Colour (Caramel E150d), Phosphoric Acid, Natural Flavourings Including Caffeine",
+    "t-drink-2": "Natural Mineral Water",
+    "s-main-1": f"{_WRAP}, Falafel (Chickpeas, Onion, Parsley, Cumin), Houmous (Chickpeas, Tahini, Lemon Juice), Spinach",
+    "s-main-2": f"{_WRAP}, Cooked Chicken (24%), Caesar Dressing (Rapeseed Oil, Water, Egg Yolk, Parmesan, Glucose Syrup, Flavouring, Stabiliser (Xanthan Gum)), Lettuce",
+    "s-snack-1": "Pineapple, Melon, Grapes",
+    "s-drink-1": "Pressed Apple Juice, Pressed Orange Juice, Mango Puree",
+    "p-main-1": "Tomatoes, Water, Onion, Cream (Milk), Basil, Rapeseed Oil, Garlic, Salt, Black Pepper",
+    "p-main-2": "Baguette (Wheat Flour, Water, Salt, Yeast), Brie (Milk), Tomatoes, Basil, Butter",
+    "p-snack-1": "Banana",
+    "p-drink-1": "Coffee, Water",
+    "l-main-1": f"{_BREAD}, Chicken (20%), Mayonnaise (Rapeseed Oil, Water, Egg, Modified Maize Starch, Preservative (Potassium Sorbate), Sweetener (Sucralose), Colour (Beta-Carotene)), Lettuce, Tomato",
+    "l-snack-1": "Wheat Flour, Palm Oil, Cheese Powder (Milk), Glucose Syrup, Salt, Raising Agent (E503), Flavour Enhancer (Monosodium Glutamate), Flavouring",
+    "l-drink-1": "Natural Mineral Water",
+    "m-main-1": "Tortilla Wrap (Wheat Flour, Water, Rapeseed Oil, Salt), Chicken Tikka (Chicken (28%), Yoghurt (Milk), Spices, Garlic, Ginger), Mango Chutney (Mango, Sugar, Vinegar), Spinach",
+    "m-main-2": "Tortilla Wrap (Wheat Flour, Water, Rapeseed Oil, Salt), Duck (25%), Hoisin Sauce (Sugar, Soybeans, Water, Vinegar, Sesame, Garlic, Modified Maize Starch), Cucumber, Spring Onion",
+    "m-snack-1": "Glucose Syrup, Sugar, Gelatine (Pork), Fruit Juice from Concentrate, Acid (Citric Acid), Flavourings, Colours (Black Carrot, Paprika Extract), Glazing Agent (Carnauba Wax)",
+    "m-drink-1": "Carbonated Natural Mineral Water",
+    "w-main-1": "Bread (Wheat Flour, Water, Yeast, Salt), Free Range Egg (45%), Mayonnaise (Rapeseed Oil, Egg Yolk, Vinegar, Mustard), Cress",
+    "w-main-2": "Tortilla Wrap (Wheat Flour, Water, Rapeseed Oil, Salt), Smoked Salmon (Fish) (28%), Soft Cheese (Milk), Spinach, Lemon Juice",
+    "w-snack-1": "Cashew Nuts, Almonds, Hazelnuts, Brazil Nuts",
+    "w-drink-1": "Carbonated Natural Mineral Water",
+}
+
 # Placeholder halal label so the Halal chip has something to show before the walk
 FALLBACK_EXTRA_FLAGS = {"m-main-1": ["halal"]}
 
@@ -238,7 +270,7 @@ def load_fallback(conn, reset: bool = False) -> None:
             "kcal": kcal,
             "protein_g": protein_g,
             "loyalty_price_gbp": item.get("loyalty_price_gbp"),
-            "ingredients_text": None,
+            "ingredients_text": FALLBACK_INGREDIENTS.get(item["item_id"]),
             "premium_range": None,
             "quality_rating": None,
             "needs_review": False,

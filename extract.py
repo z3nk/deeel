@@ -93,6 +93,10 @@ CRITICAL RULES — read carefully:
    name or printed ingredients. Return [] only if the label says vegetarian/vegan
    or the full ingredients are readable and contain no meat or fish.
    Otherwise return null.
+3a2. ingredients_text: copy the printed ingredients list exactly, including brackets and
+   E-numbers. For single-ingredient whole foods sold without an ingredients list
+   (e.g. a loose banana, bottled plain water), use the item itself, e.g. "Banana".
+   Otherwise null.
 3b. kcal and protein_g: per whole pack, from the printed nutrition panel. If only
    per-100g values are printed and the pack weight is printed, scale them;
    otherwise null. Never estimate.
