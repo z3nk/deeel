@@ -21,7 +21,7 @@ from shop_images import logo_html
 GREEN = "#0F7B5F"
 
 DEMO_PREFS = Preferences(
-    sort="quality",
+    sort="deeel",
     temperature_pref="any",
     max_price_gbp=6.0,
     max_walking_minutes=10.0,
@@ -92,7 +92,7 @@ def _step_preferences(data, render_card) -> None:
         _chip(f"Max £{p.max_price_gbp:.2f}")
         + _chip(f"{p.max_walking_minutes:.0f} min walk")
         + _chip(f"{p.temperature_pref.title()} temperature")
-        + _chip(f"Sort by {p.sort}"),
+        + _chip("Sort by Deeel score"),
         unsafe_allow_html=True,
     )
     st.caption("Your own sidebar settings aren't touched by the tour.")
@@ -115,6 +115,11 @@ def _step_results(data, render_card) -> None:
         st.caption("Section C — the best lunch at other nearby shops")
         for i, lunch in enumerate(other_shops, start=len(alternatives) + 2):
             render_card(lunch, rank=i, prefs=DEMO_PREFS, key_prefix="demo_")
+    st.info(
+        "Each combination gets a **Deeel score** out of 100: value (30), fillingness (25), "
+        "ingredient quality (25), nutrition balance (10) and deal saving (10). "
+        "Tap **How it's scored** on any card for the breakdown."
+    )
     st.caption("Sponsors never affect ranking.")
 
 

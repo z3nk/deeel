@@ -34,11 +34,13 @@ from db import (
 )
 from extract import extract_item, extract_deal, strip_exif
 from demo import screen_demo
+from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
 from map_view import build_map
 from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
     get_results,
+    lunch_deeel,
     hard_filter,
     _row_to_item,
     _row_to_shop,
@@ -185,10 +187,10 @@ def render_sidebar() -> Preferences:
     # Sort
     sort_label = st.sidebar.selectbox(
         "Sort by",
-        options=["Quality", "Distance", "Price (low to high)"],
+        options=["Deeel score", "Quality", "Distance", "Price (low to high)"],
         key="sort_select",
     )
-    sort_map = {"Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
+    sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
 
     return Preferences(
         sort=sort_map[sort_label],
@@ -251,6 +253,32 @@ def _item_nutrition(item) -> str:
     return " · ".join(parts) or "nutrition not on label"
 
 
+def _deeel_colour(total: int) -> str:
+    if total >= 70:
+        return "#16A34A"
+    if total >= 50:
+        return "#D97706"
+    return "#94A3B8"
+
+
+def _render_deeel(lunch, prefs: Preferences) -> None:
+    """Deeel score badge + a popover with the weighted breakdown."""
+    d = lunch_deeel(lunch, prefs)
+    badge_col, info_col = st.columns([1, 2])
+    with badge_col:
+        st.markdown(
+            f'<span style="background:{_deeel_colour(d.total)};color:#fff;font-weight:700;'
+            f'font-size:13px;padding:3px 10px;border-radius:999px">Deeel {d.total}</span>',
+            unsafe_allow_html=True,
+        )
+    with info_col.popover("How it's scored"):
+        for k, weight in DEEEL_WEIGHTS.items():
+            pts = weight * d.parts[k]
+            st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
+        if d.partial:
+            st.caption("Some label info is missing (nutrition or ingredients), so those parts score a neutral half.")
+
+
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):
     from models import Lunch
 
@@ -271,6 +299,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 _allergen_line([lunch.main, lunch.snack, lunch.drink], prefs.allergens_exclude),
                 unsafe_allow_html=True,
             )
+            _render_deeel(lunch, prefs)
             nutrition = _nutrition_line([lunch.main, lunch.snack, lunch.drink])
             if nutrition:
                 st.caption(nutrition)

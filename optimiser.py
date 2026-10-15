@@ -22,6 +22,7 @@ import sqlite3
 from datetime import date, timedelta
 from typing import Optional
 
+from deeel import DeeelScore, deeel_score, ingredient_score
 from models import Deal, Item, Lunch, Preferences, Shop
 
 # ---------------------------------------------------------------------------
@@ -210,6 +211,7 @@ def _weights_from_sort(prefs: Preferences) -> tuple[float, float, float]:
     distance → equal weights (distance tie-break is applied at rank_shops level)
     """
     mapping = {
+        "deeel":    (1.0, 1.0, 1.0),   # unused for ranking — deeel sort has its own search
         "quality":  (1.0, 5.0, 1.0),
         "price":    (5.0, 1.0, 1.0),
         "distance": (1.0, 1.0, 1.0),
@@ -258,6 +260,81 @@ def score_lunch(
 
 
 # ---------------------------------------------------------------------------
+# Deeel-score search
+# ---------------------------------------------------------------------------
+
+DEEEL_SHORTLIST = 4   # per category, per criterion (cheapest / best ingredients / most protein)
+
+
+def _deal_price(deal: Deal, prefs: Preferences) -> float:
+    if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp:
+        return deal.loyalty_price_gbp
+    return deal.price_gbp
+
+
+def lunch_deeel(lunch: Lunch, prefs: Preferences) -> DeeelScore:
+    """Deeel score for an already-built Lunch (used by the UI for every sort mode)."""
+    sep = sum(_effective_price(i, prefs) for i in (lunch.main, lunch.snack, lunch.drink))
+    return deeel_score(lunch.main, lunch.snack, lunch.drink, lunch.price_gbp, sep)
+
+
+def _shortlist(items: list[Item], prefs: Preferences) -> list[Item]:
+    """
+    Deeel isn't additive per item (fillingness and price are whole-meal), so we
+    search combinations — but only over a shortlist to keep reruns instant.
+    """
+    if len(items) <= DEEEL_SHORTLIST * 2:
+        return items
+    picks: dict[str, Item] = {}
+    rankings = [
+        sorted(items, key=lambda i: _effective_price(i, prefs)),
+        sorted(items, key=lambda i: -ingredient_score(i)[0]),
+        sorted(items, key=lambda i: -(i.protein_g or 0)),
+    ]
+    for ranking in rankings:
+        for item in ranking[:DEEEL_SHORTLIST]:
+            picks[item.item_id] = item
+    return list(picks.values())
+
+
+def _deeel_lunch(shop, main, snack, drink, deal, prefs) -> Optional[Lunch]:
+    """Build a Lunch for this trio at its cheapest price, or None if over the cap/limits."""
+    if _has_nutrition_limit(prefs) and not _meal_nutrition_ok(main, snack, drink, prefs):
+        return None
+    sep = _effective_price(main, prefs) + _effective_price(snack, prefs) + _effective_price(drink, prefs)
+    price, used_deal, deal_obj = sep, False, None
+    if deal is not None and main.meal_deal_eligible and snack.meal_deal_eligible and drink.meal_deal_eligible:
+        dp = _deal_price(deal, prefs)
+        if dp < sep:
+            price, used_deal, deal_obj = dp, True, deal
+    if price > (prefs.max_price_gbp or P_MAX_DEFAULT):
+        return None
+    return Lunch(
+        shop=shop, main=main, snack=snack, drink=drink,
+        price_gbp=price, used_deal=used_deal, deal=deal_obj,
+        score=deeel_score(main, snack, drink, price, sep).exact,
+    )
+
+
+def _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs) -> list[Lunch]:
+    """Best Deeel lunch for each main at this shop, best first."""
+    deal = next((d for d in deals if d.shop_id == shop.shop_id), None)
+    snacks, drinks = _shortlist(snacks, prefs), _shortlist(drinks, prefs)
+    results = []
+    for main in mains:
+        best = None
+        for snack in snacks:
+            for drink in drinks:
+                lunch = _deeel_lunch(shop, main, snack, drink, deal, prefs)
+                if lunch is not None and (best is None or lunch.score > best.score):
+                    best = lunch
+        if best is not None:
+            results.append(best)
+    results.sort(key=lambda l: -l.score)
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Per-shop exact search
 # ---------------------------------------------------------------------------
 
@@ -277,6 +354,10 @@ def best_lunch_for_shop(
 
     if not mains or not snacks or not drinks:
         return None
+
+    if prefs.sort == "deeel":
+        ranked = _deeel_lunches_by_main(shop, _shortlist(mains, prefs), snacks, drinks, deals, prefs)
+        return ranked[0] if ranked else None
 
     p_max = prefs.max_price_gbp or P_MAX_DEFAULT
     best: Optional[Lunch] = None
@@ -408,6 +489,9 @@ def top_lunches_for_shop(
 
     if not mains or not snacks or not drinks:
         return []
+
+    if prefs.sort == "deeel":
+        return _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs)[:n]
 
     p_max = prefs.max_price_gbp or P_MAX_DEFAULT
     shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
