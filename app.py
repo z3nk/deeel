@@ -35,6 +35,7 @@ from extract import build_deal, build_item, extract_photo
 from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
 from ingredients import assess as assess_ingredients
+from admin import is_admin, render_admin_sidebar
 from map_view import build_map
 from photo_store import (
     PHOTO_TYPE_LABELS, PHOTO_TYPES, UPLOAD_EXTENSIONS, UPLOAD_ROOT, save_photo, set_storefront,
@@ -1083,86 +1084,107 @@ def screen_credits():
 # Screen 5: Review queue (team only)
 # ---------------------------------------------------------------------------
 
+def _review(conn, records: list[dict], action: str) -> int:
+    """Approve or reject records. Re-checks admin mode server-side. Returns credits paid."""
+    if not is_admin():
+        st.error("Admin mode is locked.")
+        return 0
+    paid = 0
+    for r in records:
+        if action == "approve":
+            paid += approval.approve(conn, r["_id"], r["_type"])
+        else:
+            approval.reject(conn, r["_id"], r["_type"])
+    _load_data.clear()
+    return paid
+
+
+def _record_line(row: dict) -> str:
+    if row["_type"] == "deal":
+        card = f" · card £{row['loyalty_price_gbp']:.2f}" if row.get("loyalty_price_gbp") else ""
+        return f"**{row.get('name', 'Meal Deal')}** (deal sign) · £{row.get('price_gbp', 0):.2f}{card}"
+    allergens = json.loads(row.get("allergens") or "[]")
+    flag = " · ⚠️ unclear read" if row.get("needs_review") else ""
+    return (
+        f"**{row.get('name', '')}** · {row.get('category', '').upper()} · £{row.get('price_gbp', 0):.2f} · "
+        f"allergens: {', '.join(allergens) if allergens else 'not on label'}{flag}"
+    )
+
+
 def screen_review():
     st.markdown("## Review queue")
-    st.caption("Team only — approve or reject submitted photos.")
+    if not is_admin():
+        st.warning("Team only. Unlock admin mode under **Team** at the bottom of the sidebar.")
+        return
+    st.caption("Approve or reject submissions. Credits are paid to the submitter on approval.")
 
     conn = _conn()
-    pending_items = approval.get_pending_items(conn)
-    pending_deals = approval.get_pending_deals(conn)
-    total = len(pending_items) + len(pending_deals)
+    # sqlite3.Row has no .get(); plain dicts let the cards below use defaults
+    records = (
+        [{**dict(r), "_type": "item", "_id": r["item_id"]} for r in approval.get_pending_items(conn)]
+        + [{**dict(r), "_type": "deal", "_id": r["deal_id"]} for r in approval.get_pending_deals(conn)]
+    )
 
-    if total == 0:
+    if flash := st.session_state.pop("review_flash", None):
+        st.success(flash)
+
+    if not records:
         st.success("Queue is empty — nothing to review.")
         return
 
-    st.caption(f"{total} item{'s' if total != 1 else ''} pending")
+    clear = [r for r in records if r["_type"] == "deal" or not r.get("needs_review")]
+    top_col, btn_col = st.columns([3, 2])
+    top_col.caption(f"{len(records)} pending · {len(clear)} read clearly")
+    with btn_col:
+        if clear and st.button(f"Approve all {len(clear)} clear reads", type="primary", key="approve_all_clear"):
+            paid = _review(conn, clear, "approve")
+            st.session_state["review_flash"] = f"Approved {len(clear)} — {paid} credits paid."
+            st.rerun()
 
-    # sqlite3.Row has no .get(); plain dicts let the cards below use defaults
-    for row in [dict(r) for r in list(pending_items) + list(pending_deals)]:
-        record_type = "deal" if "deal_id" in row.keys() else "item"
-        record_id = row["deal_id"] if record_type == "deal" else row["item_id"]
+    # One card per photo, so a whole-shelf upload can be checked and approved together
+    shops_map = {s.shop_id: s.name for s in _load_data()[0]}
+    by_photo: dict[str, list[dict]] = {}
+    for r in records:
+        by_photo.setdefault(r["source_image"], []).append(r)
 
+    for photo, rows in by_photo.items():
         with st.container(border=True):
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                src = UPLOAD_DIR / row["source_image"]
+            img_col, info_col = st.columns([1, 2])
+            with img_col:
+                src = UPLOAD_DIR / photo
                 if src.exists():
-                    st.image(str(src), width=200)
+                    st.image(str(src), use_container_width=True)
                 else:
-                    st.caption("[label photo]")
-
-            with c2:
-                # Resolve shop name from shops list
-                all_shops_map = {s.shop_id: s.name for s in _load_data()[0]}
-                shop_display = all_shops_map.get(row.get("shop_id", ""), row.get("shop_id", "Unknown shop"))
-                st.markdown(f"**{shop_display}** · {row.get('name', '')}")
-
-                if record_type == "item":
-                    allergens = json.loads(row.get("allergens", "[]"))
-                    st.caption(
-                        f"{row.get('category','').upper()} · "
-                        f"£{row.get('price_gbp', 0):.2f} · "
-                        f"Allergens: {', '.join(allergens) if allergens else 'not on label'} · "
-                        f"uploaded by student #{row.get('submitted_by', 'anonymous')}"
-                    )
-
-                    # Confidence bar
-                    conf_str = row.get("confidence", "high")
-                    conf_val = {"high": 0.92, "medium": 0.72, "low": 0.45}.get(conf_str, 0.92)
-                    st.caption("Model confidence")
-                    st.progress(conf_val, text=f"{int(conf_val * 100)}%  (threshold: 85%)")
-
-                    if row.get("needs_review"):
-                        flag_reason = (
-                            "Confidence below 85% — label may be partially obscured or blurry."
-                            if conf_val < 0.85
-                            else "Flagged for manual review."
-                        )
-                        st.caption(f"Why it was flagged: {flag_reason}")
-                else:
-                    st.caption(f"Deal · £{row.get('price_gbp', 0):.2f}")
-
-                st.caption(str(row.get("last_seen", "")))
-
-                done_key = f"done_{record_id}"
-                if st.session_state.get(done_key):
-                    st.markdown(f"**{st.session_state[done_key]}**")
-                else:
-                    ap_col, rj_col = st.columns(2)
-                    with ap_col:
-                        if st.button("Approve", key=f"approve_{record_id}", type="primary"):
-                            credits = approval.approve(conn, record_id, record_type)
-                            msg = f"Approved — {credits} credits paid" if credits else "Approved"
-                            st.session_state[done_key] = msg
-                            _load_data.clear()
-                            st.rerun()
-                    with rj_col:
-                        if st.button("Reject", key=f"reject_{record_id}"):
-                            approval.reject(conn, record_id, record_type)
-                            st.session_state[done_key] = "Rejected"
-                            _load_data.clear()
-                            st.rerun()
+                    st.caption("[photo not on this server]")
+            with info_col:
+                first = rows[0]
+                st.markdown(
+                    f"**{shops_map.get(first['shop_id'], first['shop_id'])}** · {len(rows)} from this photo"
+                )
+                st.caption(
+                    f"Uploaded by {first.get('submitted_by') or 'seed walk'} · {first.get('last_seen', '')} · `{photo}`"
+                )
+                for r in rows:
+                    line_col, ap_col, rj_col = st.columns([6, 1, 1])
+                    line_col.markdown(_record_line(r))
+                    if ap_col.button("✓", key=f"approve_{r['_id']}", help="Approve"):
+                        paid = _review(conn, [r], "approve")
+                        st.session_state["review_flash"] = f"Approved {r.get('name')} — {paid} credits paid."
+                        st.rerun()
+                    if rj_col.button("✗", key=f"reject_{r['_id']}", help="Reject"):
+                        _review(conn, [r], "reject")
+                        st.session_state["review_flash"] = f"Rejected {r.get('name')}."
+                        st.rerun()
+                if len(rows) > 1:
+                    all_col, rej_col = st.columns(2)
+                    if all_col.button(f"Approve all {len(rows)} from this photo", key=f"approve_photo_{photo}"):
+                        paid = _review(conn, rows, "approve")
+                        st.session_state["review_flash"] = f"Approved {len(rows)} — {paid} credits paid."
+                        st.rerun()
+                    if rej_col.button("Reject all from this photo", key=f"reject_photo_{photo}"):
+                        _review(conn, rows, "reject")
+                        st.session_state["review_flash"] = f"Rejected {len(rows)}."
+                        st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -1173,19 +1195,23 @@ SCREENS = {
     "Find": "find",
     "Add a photo": "upload",
     "My credits": "credits",
-    "Review queue": "review",
 }
+ADMIN_SCREENS = {"Review queue": "review"}
 
 
 def main():
     prefs = render_sidebar()
+    render_admin_sidebar()
 
     if "screen" not in st.session_state:
         st.session_state["screen"] = "find"
 
+    # Review queue only appears in the nav once admin mode is unlocked
+    screens = {**SCREENS, **ADMIN_SCREENS} if is_admin() else SCREENS
+
     # Top nav, with the "?" tour button as a narrow last column (top-right corner)
-    nav_cols = st.columns([1] * len(SCREENS) + [0.25])
-    for col, (label, key) in zip(nav_cols, SCREENS.items()):
+    nav_cols = st.columns([1] * len(screens) + [0.25])
+    for col, (label, key) in zip(nav_cols, screens.items()):
         with col:
             if st.button(label, use_container_width=True):
                 st.session_state["screen"] = key

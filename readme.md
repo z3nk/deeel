@@ -64,7 +64,7 @@ pip install -r requirements.txt
 
 # Add your Anthropic API key
 cp .env.example .env
-# Edit .env with your key
+# Edit .env with your key, and set ADMIN_PASSCODE to unlock the Review queue
 
 # Run the app
 streamlit run app.py
@@ -79,6 +79,7 @@ optimiser.py      Filters, scoring, per-shop search
 deeel.py          Deeel score (0–100)
 ingredients.py    Ingredient quality: processing markers + ingredient count
 demo.py           Live tour behind the ? button
+admin.py          Team passcode gate for the Review queue
 shop_images.py    Shop logos / storefront photos
 photo_store.py    uploads/<shop_id>/<general|main|snack|drink>/ photo filing
 map_view.py       Folium map helper
@@ -94,5 +95,6 @@ tests/            pytest suite
 
 - Diet flags and allergens come **only** from printed label text — never inferred.
 - Items with unknown allergen data are excluded when allergen filters are active.
-- Duplicate photos are rejected by image hash.
+- The Review queue is team-only: unlock it under **Team** in the sidebar with the shared `ADMIN_PASSCODE` (from `.env` locally or Streamlit secrets when deployed). With no passcode set it stays locked. Approve one product, a whole photo, or every clear read at once.
+- Re-uploading the same photo is detected by content hash.
 - Photos are filed as `uploads/<shop_id>/<general|main|snack|drink>/`, rotated upright, shrunk, and re-saved without EXIF, so location data is never stored. Re-uploading the same photo is detected.

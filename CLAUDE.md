@@ -39,4 +39,5 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 
 ## User identity
 - Name text input in the sidebar sets `st.session_state["username"]` as `user_id`.
-- No auth, no passwords. Handle only.
+- No auth, no passwords for students. Handle only.
+- Exception: the Review queue is team-only behind one shared `ADMIN_PASSCODE` (`admin.py`), read from Streamlit secrets or `.env`, never committed. Unset = locked. Approve/reject re-check admin mode server-side.
