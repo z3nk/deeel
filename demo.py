@@ -65,7 +65,7 @@ def _exit(to: str = "find") -> None:
 def _step_welcome(data, render_card) -> None:
     st.markdown("### Find the best lunch near UCL")
     st.markdown(
-        "Deelicious ranks the shops around UCL Bloomsbury and builds the best "
+        "Deeelicious ranks the shops around UCL Bloomsbury and builds the best "
         "**main + snack + drink** at each one, checking whether the meal deal or "
         "buying separately is cheaper."
     )

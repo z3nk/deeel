@@ -1,5 +1,5 @@
 """
-Frozen Pydantic schema for Deelicious.
+Frozen Pydantic schema for Deeelicious.
 Do NOT modify this file without agreement from the whole team.
 All three record types (Shop, Deal, Item) plus User, CreditEvent, Reward.
 """

@@ -1,4 +1,4 @@
-# Deelicious: Build Plan
+# Deeelicious: Build Plan
 
 Oct 12, 2026 · @Neeam R · **v2 — three-section results, map view, sidebar-only controls**
 
