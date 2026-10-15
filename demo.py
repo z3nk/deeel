@@ -121,7 +121,7 @@ def _step_results(data, render_card) -> None:
     st.info(
         "Each combination gets a **Deeel score** out of 100: value (30), fillingness (25), "
         "ingredient quality (25), nutrition balance (10) and deal saving (10). "
-        "Tap **How it's scored** on any card for the breakdown."
+        "Tap **Deeel score** on any card for the breakdown."
     )
     st.caption("Sponsors never affect ranking.")
 
@@ -131,11 +131,11 @@ def _step_map(data, render_card) -> None:
     primary, alternatives, other_shops = get_results(shops, items, deals, DEMO_PREFS)
     st.markdown("### See it on a map")
     st.markdown(
-        "The **Map view** tab shows the same results. Markers are in each shop's brand colour "
-        "with its rank number, grey for shops outside your filters, and the dashed circle "
-        "is your walking limit."
+        "The **Map view** tab shows the same results. Markers display each shop's logo "
+        "with a star badge on the #1 pick, grey for shops outside your filters, and the "
+        "dashed circle is your walking limit."
     )
-    ranked = [primary] + alternatives + other_shops if primary else []
+    ranked = [primary] + other_shops if primary else []
     fmap = build_map(ranked, shops, walking_limit_minutes=DEMO_PREFS.max_walking_minutes)
     st_folium(fmap, width=900, height=420, returned_objects=[], key="demo_map")
 
@@ -164,14 +164,6 @@ def _step_filters(data, render_card) -> None:
         with st.container(border=True):
             st.caption(label)
             st.markdown(_summary(primary), unsafe_allow_html=True)
-    # Serious mode: the allergy explanation uses the AllergyWarning box, not a generic info box
-    st.markdown(
-        '<div class="dl-box dl-box--allergy">Diet, halal and kosher come <strong>only from printed label '
-        "text</strong>. Allergens are read by computer from labels, with gaps filled from Open Food Facts by "
-        "barcode — but only printed-label allergens can clear an item for an allergy filter; unknown means "
-        "unsafe. <strong>Allergen info can be wrong — always check the packaging.</strong></div>",
-        unsafe_allow_html=True,
-    )
 
 
 def _step_deal(data, render_card) -> None:

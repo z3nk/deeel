@@ -51,6 +51,28 @@ def _data_uri(path: Path) -> str:
     return f"data:{_MIME[path.suffix.lower()]};base64,{data}"
 
 
+_last_logo_dir: Path | None = None
+
+
+@lru_cache(maxsize=32)
+def _cached_logo_data_uri(chain: str) -> str | None:
+    path = _find(LOGO_DIR, chain)
+    return _data_uri(path) if path is not None else None
+
+
+def logo_data_uri(chain: str) -> str | None:
+    """Return base64 data URI for chain logo, or None if no image file exists."""
+    global _last_logo_dir
+    if _last_logo_dir != LOGO_DIR:
+        _cached_logo_data_uri.cache_clear()
+        _last_logo_dir = LOGO_DIR
+    return _cached_logo_data_uri(chain)
+
+
+logo_data_uri.cache_info = _cached_logo_data_uri.cache_info
+logo_data_uri.cache_clear = _cached_logo_data_uri.cache_clear
+
+
 def storefront_path(shop: Shop) -> Path | None:
     """Storefront photo for this branch: a hand-added asset, else one set from an upload."""
     from photo_store import storefront_upload
@@ -65,12 +87,12 @@ def logo_html(shop: Shop, size: int = 28, standalone: bool = False) -> str:
     """
     from theme import token, type_css
 
-    logo = _find(LOGO_DIR, shop.chain)
+    uri = logo_data_uri(shop.chain)
     surface = token("surface") if standalone else "var(--surface)"
     radius = token("radius-badge") if standalone else "var(--radius-badge)"
     gap = token("space-2") if standalone else "var(--space-2)"
-    if logo is not None:
-        return (f'<img src="{_data_uri(logo)}" alt="{shop.name}" style="width:{size}px;height:{size}px;'
+    if uri is not None:
+        return (f'<img src="{uri}" alt="{shop.name}" style="width:{size}px;height:{size}px;'
                 f'border-radius:{radius};vertical-align:middle;margin-right:{gap};'
                 f'object-fit:contain;background:{surface}">')
 

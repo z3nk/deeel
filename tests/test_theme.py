@@ -24,7 +24,7 @@ def test_page_css_defines_every_class_the_app_uses():
     css = theme.page_css()
     used = set()
     for name in UI_FILES:
-        used |= set(re.findall(r"\b(dl-[a-z0-9_-]+)", (ROOT / name).read_text()))
+        used |= set(re.findall(r"\b(dl-[a-z0-9_-]+)", (ROOT / name).read_text(encoding="utf-8")))
     used = {c for c in used if not c.endswith("-")}           # f-string stems, checked below
     defined = set(re.findall(r"\.(dl-[a-z0-9_-]+)", css))
     assert used - defined == set()
@@ -38,7 +38,7 @@ def test_page_css_defines_every_class_the_app_uses():
 def test_no_hard_coded_colours_or_font_sizes():
     pattern = re.compile(r"#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b|font-size\s*[:=]|color:\s*white")
     for name in UI_FILES:
-        for n, line in enumerate((ROOT / name).read_text().splitlines(), start=1):
+        for n, line in enumerate((ROOT / name).read_text(encoding="utf-8").splitlines(), start=1):
             if line.lstrip().startswith("#"):
                 continue
             assert not pattern.search(line), f"{name}:{n} hard-codes a colour/size: {line.strip()}"

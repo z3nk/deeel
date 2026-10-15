@@ -78,7 +78,8 @@
 .dl-card__basket { margin: var(--space-2) 0 var(--space-1); font-size: 14px; line-height: 20px; }
 .dl-card__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
 .dl-card--featured .dl-card__meta { color: var(--text); }
-.dl-card__price-row { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+.dl-card__price-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+.dl-card__price-row .dl-badge { margin-left: auto; }
 .dl-card__price { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .dl-card__strike { text-decoration: line-through; color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
 .dl-card--featured .dl-card__strike { color: var(--text); }
@@ -119,19 +120,37 @@
    st.pills renders plain buttons with no selected-state hook, so the off state
    lives here (scoped by widget key) and app.py emits the "on" rule per run for
    the selected positions (_chip_state_css). Same look as .dl-chip. */
-.st-key-allergens_avoid button, .st-key-allergens_avoid_quick button,
-.st-key-diets button, .st-key-meats_allowed button {
+.st-key-diets [data-testid="stButtonGroup"] button,
+.st-key-meats_allowed [data-testid="stButtonGroup"] button {
   font-family: var(--font-ui); font-weight: 600; min-height: 32px;
   padding: 6px var(--space-3); border-radius: var(--radius-chip);
   border: var(--border-width-hairline) solid var(--border-strong);
   background: var(--surface); color: var(--text);
 }
-.st-key-allergens_avoid button p, .st-key-allergens_avoid_quick button p,
-.st-key-diets button p, .st-key-meats_allowed button p { font-size: 13px; line-height: 16px; font-weight: 600; }
-.st-key-allergens_avoid button:hover, .st-key-allergens_avoid_quick button:hover { border-color: var(--allergen-ink); color: var(--allergen-ink); }
-.st-key-diets button:hover, .st-key-meats_allowed button:hover { border-color: var(--primary); color: var(--primary); }
-.st-key-allergens_avoid button:focus-visible, .st-key-allergens_avoid_quick button:focus-visible,
-.st-key-diets button:focus-visible, .st-key-meats_allowed button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.st-key-diets [data-testid="stButtonGroup"] button p,
+.st-key-meats_allowed [data-testid="stButtonGroup"] button p { font-size: 13px; line-height: 16px; font-weight: 600; }
+.st-key-diets [data-testid="stButtonGroup"] button:hover,
+.st-key-meats_allowed [data-testid="stButtonGroup"] button:hover { border-color: var(--primary); color: var(--primary); }
+.st-key-diets [data-testid="stButtonGroup"] button:focus-visible,
+.st-key-meats_allowed [data-testid="stButtonGroup"] button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* Tooltip helper icon next to labels — no outline box, no border, no background */
+[data-testid="stTooltipHoverTarget"],
+[data-testid="stTooltipHoverTarget"] button,
+.stTooltipHoverTarget,
+.stTooltipHoverTarget button,
+.st-key-meats_allowed [data-testid="stTooltipHoverTarget"],
+.st-key-meats_allowed [data-testid="stTooltipHoverTarget"] button {
+  border: none !important;
+  background: transparent !important;
+  min-height: unset !important;
+  height: auto !important;
+  width: auto !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
 /* Filter bar on the Find screen */
 .st-key-dl_filter_bar { margin-bottom: var(--space-2); }
 .st-key-dl_allergy_pills .dl-box, .st-key-dl_allergy_pills_quick .dl-box { margin-top: var(--space-2); font-size: 12px; line-height: 16px; }
@@ -190,9 +209,69 @@
   .st-key-dl_nav button { min-height: 36px; padding: var(--space-1) var(--space-1); }
   .st-key-dl_nav button p { font-size: 12px; line-height: 14px; white-space: normal; }
 }
-/* Result-card actions: popover left, "See basket →" right as a primary-coloured link */
-[class*="dl_card_actions"] [data-testid="stColumn"]:last-child { display: flex; justify-content: flex-end; }
-[class*="dl_card_actions"] button[kind="tertiary"] p { color: var(--primary); font-weight: 600; }
+/* Result-card actions: popover left, "View basket →" right as a primary-coloured link */
+[class*="dl_card_actions"] [data-testid="stColumn"]:last-child {
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+[class*="dl_card_actions"] [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"] {
+  align-items: flex-end !important;
+}
+[class*="dl_card_actions"] [data-testid="stColumn"]:last-child [data-testid="stElementContainer"] {
+  width: auto !important;
+  margin-left: auto !important;
+}
+[class*="dl_card_actions"] button[kind="tertiary"] {
+  min-height: 28px !important;
+  padding: 2px 0 !important;
+  margin-left: auto !important;
+}
+[class*="dl_card_actions"] button[kind="tertiary"] p {
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+[class*="dl_card_actions"] [data-testid="stPopover"] button {
+  border-radius: var(--radius-chip) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 13px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+  padding: 4px 12px !important;
+  min-height: 28px !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+[class*="dl_card_actions"][class*="_high"] [data-testid="stPopover"] button,
+[class*="dl_card_actions"][class*="_high"] [data-testid="stPopover"] button:hover,
+[class*="dl_card_actions"][class*="_high"] [data-testid="stPopover"] button:active {
+  background: var(--score-high) !important;
+  color: var(--on-primary) !important;
+}
+[class*="dl_card_actions"][class*="_mid"] [data-testid="stPopover"] button,
+[class*="dl_card_actions"][class*="_mid"] [data-testid="stPopover"] button:hover,
+[class*="dl_card_actions"][class*="_mid"] [data-testid="stPopover"] button:active {
+  background: var(--score-mid) !important;
+  color: var(--on-primary) !important;
+}
+[class*="dl_card_actions"][class*="_low"] [data-testid="stPopover"] button,
+[class*="dl_card_actions"][class*="_low"] [data-testid="stPopover"] button:hover,
+[class*="dl_card_actions"][class*="_low"] [data-testid="stPopover"] button:active {
+  background: var(--score-low) !important;
+  color: var(--on-primary) !important;
+}
+[class*="dl_card_actions"] [data-testid="stPopover"] button p {
+  color: var(--on-primary) !important;
+  font-family: var(--font-ui) !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+[class*="dl_card_actions"] [data-testid="stPopover"] button svg {
+  fill: var(--on-primary) !important;
+  color: var(--on-primary) !important;
+}
 
 /* Selectboxes (shop-page pickers): token borders, radius and type */
 [data-testid="stSelectbox"] [data-baseweb="select"] > div {
@@ -200,6 +279,15 @@
   font-family: var(--font-ui);
 }
 [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within { border-color: var(--primary); }
+[data-testid="stSelectbox"] [data-baseweb="select"],
+[data-testid="stSelectbox"] [data-baseweb="select"] *,
+[data-testid="stSelectbox"] input,
+[data-testid="stMultiSelect"] [data-baseweb="select"],
+[data-testid="stMultiSelect"] [data-baseweb="select"] *,
+[data-testid="stMultiSelect"] input {
+  cursor: pointer !important;
+  caret-color: transparent !important;
+}
 
 /* Hide Streamlit's hover "link to heading" buttons */
 [data-testid="stHeaderActionElements"], .stHeadingWithActionElements a,
@@ -213,3 +301,121 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
 .dl-bar__fill--high { background: var(--success); }
 .dl-bar__fill--mid { background: var(--warning); }
 .dl-bar__fill--low { background: var(--rank-out); }
+
+/* MultiSelect & allergy tags */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+  border-radius: var(--radius-button);
+  border-color: var(--border-strong);
+  font-family: var(--font-ui);
+  background: var(--surface);
+}
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within {
+  border-color: var(--primary);
+}
+.st-key-allergens_avoid [data-baseweb="tag"],
+.st-key-allergens_avoid_quick [data-baseweb="tag"] {
+  background: var(--allergen) !important;
+  border-radius: var(--radius-chip) !important;
+  color: var(--on-primary) !important;
+}
+.st-key-allergens_avoid [data-baseweb="tag"] *,
+.st-key-allergens_avoid_quick [data-baseweb="tag"] * {
+  color: var(--on-primary) !important;
+}
+/* Individual unselect button (x on allergy tag) */
+.st-key-allergens_avoid [data-baseweb="tag"] [role="button"],
+.st-key-allergens_avoid_quick [data-baseweb="tag"] [role="button"],
+.st-key-allergens_avoid [data-baseweb="tag"] button,
+.st-key-allergens_avoid_quick [data-baseweb="tag"] button,
+[data-testid="stMultiSelect"] [data-baseweb="tag"] [role="button"],
+[data-testid="stMultiSelect"] [data-baseweb="tag"] button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: unset !important;
+  height: 14px !important;
+  width: 14px !important;
+  padding: 0 !important;
+  margin: 0 0 0 4px !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  visibility: visible !important;
+  opacity: 0.9 !important;
+}
+.st-key-allergens_avoid [data-baseweb="tag"] [role="button"]:hover,
+.st-key-allergens_avoid_quick [data-baseweb="tag"] [role="button"]:hover,
+.st-key-allergens_avoid [data-baseweb="tag"] button:hover,
+.st-key-allergens_avoid_quick [data-baseweb="tag"] button:hover,
+[data-testid="stMultiSelect"] [data-baseweb="tag"] [role="button"]:hover,
+[data-testid="stMultiSelect"] [data-baseweb="tag"] button:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-radius: 50% !important;
+}
+.st-key-allergens_avoid [data-baseweb="tag"] svg,
+.st-key-allergens_avoid_quick [data-baseweb="tag"] svg,
+[data-testid="stMultiSelect"] [data-baseweb="tag"] svg {
+  fill: var(--on-primary) !important;
+  color: var(--on-primary) !important;
+  width: 12px !important;
+  height: 12px !important;
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Unselect all (clear all) button on multiselect */
+.st-key-allergens_avoid [data-baseweb="select"] [aria-label="Clear all"],
+.st-key-allergens_avoid_quick [data-baseweb="select"] [aria-label="Clear all"],
+.st-key-allergens_avoid [data-baseweb="select"] button,
+.st-key-allergens_avoid_quick [data-baseweb="select"] button,
+[data-testid="stMultiSelect"] [aria-label="Clear all"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: unset !important;
+  height: 20px !important;
+  width: 20px !important;
+  padding: 0 !important;
+  margin-right: 4px !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  visibility: visible !important;
+  opacity: 0.7 !important;
+}
+.st-key-allergens_avoid [data-baseweb="select"] [aria-label="Clear all"]:hover,
+.st-key-allergens_avoid_quick [data-baseweb="select"] [aria-label="Clear all"]:hover,
+[data-testid="stMultiSelect"] [aria-label="Clear all"]:hover {
+  opacity: 1 !important;
+}
+.st-key-allergens_avoid [data-baseweb="select"] [aria-label="Clear all"] svg,
+.st-key-allergens_avoid_quick [data-baseweb="select"] [aria-label="Clear all"] svg,
+.st-key-allergens_avoid [data-baseweb="select"] button svg,
+.st-key-allergens_avoid_quick [data-baseweb="select"] button svg,
+[data-testid="stMultiSelect"] [aria-label="Clear all"] svg {
+  fill: var(--text) !important;
+  color: var(--text) !important;
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Hide "Press Enter to apply" instruction on text inputs */
+[data-testid="InputInstructions"],
+.st-key-admin_passcode_input [data-testid="InputInstructions"] {
+  display: none !important;
+}
+
+/* Alignment fixes for card actions and filter bar */
+[class*="dl_card_actions"] [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+}
+[class*="dl_card_actions"] button[kind="tertiary"] {
+  min-height: 28px !important;
+  padding: 2px var(--space-2) !important;
+}
+.st-key-dl_filter_bar [data-testid="stCaptionContainer"] p {
+  margin: 0 !important;
+}

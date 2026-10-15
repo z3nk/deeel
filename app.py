@@ -128,11 +128,11 @@ ALLERGY_WARNING = (
 
 
 def _allergen_text(item) -> str:
-    """'Allergens: milk, gluten (Open Food Facts) · ⚠️ computer-read — check the pack'."""
+    """'Allergens: milk, gluten (Open Food Facts)'."""
     allergens = ", ".join(item.allergens) if item.allergens else "none found on label"
     source = item.external_fields.get("allergens")
     via = f" ({source})" if source else ""
-    return f"Allergens: {allergens}{via} · {ALLERGY_WARNING_SHORT}"
+    return f"Allergens: {allergens}{via}"
 DIETS     = ["Vegetarian", "Vegan", "Halal", "Kosher"]
 MEATS     = ["Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
@@ -146,20 +146,17 @@ DIET_KEY = "diets"
 
 
 def _allergy_box_html() -> str:
-    """The full allergy warning as the design system's .dl-box--allergy (never dismissable)."""
-    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", ALLERGY_WARNING)
-    return f'<div class="dl-box dl-box--allergy" role="note">{text}</div>'
+    return ""
 
 
 _CHIP_ON = {
     "allergy": "background: var(--allergen); border-color: var(--allergen); color: var(--on-primary);",
     "diet": "background: var(--primary); border-color: var(--primary); color: var(--on-primary);",
 }
-# On-state wording: allergy "No Gluten ✕", diet "Vegan ✓". Added in CSS because pill
-# labels must stay fixed: Streamlit derives the widget id from them, so changing a
-# label would reset the selection.
+# On-state wording: allergy "No Gluten ✕", diet: no mark when selected, " ✕" on hover to deselect.
 _CHIP_BEFORE = {"allergy": '"No "', "diet": None}
-_CHIP_AFTER = {"allergy": '" ✕"', "diet": '" ✓"'}
+_CHIP_AFTER = {"allergy": '" ✕"', "diet": None}
+_CHIP_AFTER_HOVER = {"allergy": '" ✕"', "diet": '" ✕"'}
 
 
 def _chip_state_css(key: str, options: list[str], variant: str) -> str:
@@ -173,11 +170,14 @@ def _chip_state_css(key: str, options: list[str], variant: str) -> str:
     for i, option in enumerate(options, start=1):
         if option not in selected:
             continue
-        button = f".st-key-{key} button:nth-child({i})"
-        rules.append(f"{button}, {button}:hover {{ {_CHIP_ON[variant]} }}")
-        if _CHIP_BEFORE[variant]:
-            rules.append(f"{button} p::before {{ content: {_CHIP_BEFORE[variant]}; }}")
-        rules.append(f"{button} p::after {{ content: {_CHIP_AFTER[variant]}; }}")
+        btn = f".st-key-{key} [data-testid='stButtonGroup'] button:nth-of-type({i}), .st-key-{key} button:nth-child({i})"
+        rules.append(f"{btn}, {btn}:hover {{ {_CHIP_ON[variant]} }}")
+        if _CHIP_BEFORE.get(variant):
+            rules.append(f"{btn} p::before {{ content: {_CHIP_BEFORE[variant]}; }}")
+        if _CHIP_AFTER.get(variant):
+            rules.append(f"{btn} p::after {{ content: {_CHIP_AFTER[variant]}; }}")
+        if _CHIP_AFTER_HOVER.get(variant):
+            rules.append(f"{btn}:hover p::after {{ content: {_CHIP_AFTER_HOVER[variant]}; }}")
     return f"<style>{' '.join(rules)}</style>" if rules else ""
 
 
@@ -222,10 +222,10 @@ def render_sidebar() -> Preferences:
         avoid = st.multiselect(
             "Allergies — avoid", ALLERGENS, key=ALLERGY_KEY,
             label_visibility="collapsed", placeholder="Choose allergies to avoid…",
+            select_all=False,
         ) or []
         if avoid:
             st.caption("Items without allergen info from a printed label are hidden.")
-        st.markdown(_allergy_box_html(), unsafe_allow_html=True)
     st.sidebar.divider()
 
     # Diet + meat — DietChip style
@@ -317,40 +317,8 @@ def render_sidebar() -> Preferences:
 
 
 def render_filter_bar(prefs: Preferences) -> None:
-    """
-    Compact filter bar at the top of the Find screen. On phones the sidebar starts
-    collapsed, so this keeps the allergy chips one tap away and says what's active.
-    """
-    active = []
-    if prefs.allergens_exclude:
-        active.append("avoiding " + ", ".join(prefs.allergens_exclude))
-    active += [d.title() for d in prefs.diet_flags]
-    if prefs.meats_allowed:
-        active.append(" / ".join(m.title() for m in prefs.meats_allowed))
-    if prefs.max_price_gbp:
-        active.append(f"≤ £{prefs.max_price_gbp:.2f}")
-    active.append(f"{prefs.max_walking_minutes:.0f} min walk")
-
-    with st.container(key="dl_filter_bar"):
-        summary_col, button_col = st.columns([3, 1], vertical_alignment="center")
-        with summary_col:
-            st.caption("Filters: " + " · ".join(active))
-        with button_col:
-            with st.popover("Allergies", use_container_width=True):
-                with st.container(key="dl_allergy_pills_quick"):
-                    st.markdown(
-                        '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
-                        unsafe_allow_html=True,
-                    )
-                    # Mirror the sidebar's chips before rendering (never after)
-                    st.session_state[ALLERGY_QUICK_KEY] = list(st.session_state.get(ALLERGY_KEY) or [])
-                    st.multiselect(
-                        "Allergies — avoid", ALLERGENS, key=ALLERGY_QUICK_KEY,
-                        label_visibility="collapsed", placeholder="Choose allergies to avoid…",
-                        on_change=_copy_quick_allergies,
-                    )
-                    st.markdown(_allergy_box_html(), unsafe_allow_html=True)
-                st.caption("More filters (diet, budget, walk, sort): tap › at the top left.")
+    """Filter bar removed per design request."""
+    pass
 
 
 # ---------------------------------------------------------------------------
@@ -366,25 +334,20 @@ def _freshness_badge(last_seen_str: str) -> str:
         return f'<span class="dl-badge dl-badge--stale">● Seen {days}d ago</span>'
     if days > 7:
         return f'<span class="dl-badge dl-badge--ageing">● Seen {days}d ago</span>'
+    if days == 0:
+        return '<span class="dl-badge dl-badge--fresh">● Seen today</span>'
     return f'<span class="dl-badge dl-badge--fresh">● Seen {days}d ago</span>'
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
     all_allergens = sorted({a for i in items_list for a in i.allergens})
     allergen_str = ", ".join(all_allergens) if all_allergens else "none found on labels"
-    if any(not i.allergens for i in items_list):
-        allergen_str += " (allergens not checked for some items)"
-    if any("allergens" in i.external_fields for i in items_list):
-        allergen_str += " (partly from Open Food Facts / other photos)"
-    return f"Allergens: {allergen_str} · {ALLERGY_WARNING_SHORT}"
+    return f"Allergens: {allergen_str}"
 
 
 def _nutrition_line(items_list) -> str:
     """'1,040 kcal · 31 g protein' for the meal, or '' if any value is missing."""
-    plain = _nutrition_line_plain(items_list)
-    if plain and any(f in i.external_fields for i in items_list for f in ("kcal", "protein_g")):
-        return plain + " · partly from Open Food Facts / other photos"
-    return plain
+    return _nutrition_line_plain(items_list)
 
 
 def _nutrition_line_plain(items_list) -> str:
@@ -477,15 +440,13 @@ def _md_bold(text: str) -> str:
 
 
 def _allergy_box() -> str:
-    """Full allergy warning as the AllergyWarning box (never dismissable)."""
-    return f'<div class="dl-box dl-box--allergy" role="note">{_md_bold(ALLERGY_WARNING)}</div>'
+    return ""
 
 
 def _allergen_line_html(items_list) -> str:
-    """Allergen line with the short warning styled per AllergyWarning (serious mode)."""
-    text = _allergen_line(items_list, []).removesuffix(f" · {ALLERGY_WARNING_SHORT}")
-    return (f'<div class="dl-allergen-line dl-card__note">{escape(text)} · '
-            f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div>')
+    """Allergen line without warnings."""
+    text = _allergen_line(items_list, [])
+    return f'<div class="dl-allergen-line dl-card__note">{escape(text)}</div>'
 
 
 def _deal_html(lunch) -> str:
@@ -523,10 +484,6 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
     top.append(f'<span class="dl-card__walk">{lunch.shop.walking_minutes:.0f} min walk</span>')
 
     body = [f'<div class="dl-card__top">{"".join(top)}</div>']
-    if sample:
-        body.append('<div class="dl-card__meta dl-card__note" style="color:var(--sample)">'
-                    "⚠️ Sample data — we haven't photographed this shop yet, so these "
-                    "products and prices are placeholders.</div>")
     body.append(f'<div class="dl-card__basket">{escape(" + ".join(i.name for i in trio))}</div>')
     nutrition = _nutrition_line(trio)
     if nutrition:
@@ -535,29 +492,28 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
     if lunch.why:
         body.append(f'<div class="dl-card__meta dl-card__note"><em>{escape(lunch.why)}</em></div>')
 
-    price_cls = "dl-card__price" if featured else "dl-card__price dl-card__price--sm"
-    body.append(f'<div class="dl-card__price-row"><span class="{price_cls}">£{lunch.price_gbp:.2f}</span>'
-                f'{_deal_html(lunch)}</div>')
-
     oldest = max(
         ((date.today() - date.fromisoformat(i.last_seen)).days for i in trio if isinstance(i.last_seen, str)),
         default=0,
     )
     fresh = _freshness_badge((date.today() - timedelta(days=oldest)).isoformat())
-    body.append(f'<div class="dl-card__foot"><span class="dl-score dl-score--{_deeel_band(d.total)}">'
-                f'Deeel {d.total}</span>{fresh}</div>')
+
+    price_cls = "dl-card__price" if featured else "dl-card__price dl-card__price--sm"
+    body.append(f'<div class="dl-card__price-row"><span class="{price_cls}">£{lunch.price_gbp:.2f}</span>'
+                f'{_deal_html(lunch)}{fresh}</div>')
 
     card_cls = "dl-card dl-card--in-st" + (" dl-card--featured" if featured else "")
     with st.container(border=True):
         st.markdown(f'<div class="{card_cls}">{"".join(body)}</div>', unsafe_allow_html=True)
         # One row on every width (CSS stops Streamlit stacking it on phones); the
         # basket action is a link-style button, as in the ResultCard spec
-        with st.container(key=f"{key_prefix}dl_card_actions_{lunch.shop.shop_id}_{rank}"):
+        band = _deeel_band(d.total)
+        with st.container(key=f"{key_prefix}dl_card_actions_{lunch.shop.shop_id}_{rank}_{band}"):
             score_col, basket_col = st.columns(2)
-        with score_col.popover("How it's scored"):
+        with score_col.popover(f"Deeel score {d.total}"):
             _render_deeel_breakdown(lunch, d)
         with basket_col:
-            if st.button("See basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}",
+            if st.button("View basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}",
                          type="tertiary"):
                 st.session_state["detail_shop_id"] = lunch.shop.shop_id
                 st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
@@ -586,7 +542,7 @@ def screen_find(prefs: Preferences):
             filtered = hard_filter(items, prefs)
             in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes]
             if not in_range:
-                st.warning("No shops within your walking limit.")
+                st.info("No shops within your walking limit.")
                 if st.button("Relax to 15 min", key="relax_walk"):
                     st.session_state["walk_limit_override"] = 15
                     st.rerun()
@@ -602,24 +558,24 @@ def screen_find(prefs: Preferences):
                 else:
                     msg = "No mains match your diet filters."
                     btn_text = "Clear diet filters"
-                st.warning(msg)
+                st.info(msg)
                 if st.button(btn_text, key="relax_diet"):
                     # Each button clears exactly what its label says
                     st.session_state["_clear_diet_pending"] = has_diet or not has_allergy
                     st.session_state["_clear_allergy_pending"] = has_allergy
                     st.rerun()
             elif not any(i.category == "snack" for i in filtered) or not any(i.category == "drink" for i in filtered):
-                st.warning("No snacks or drinks match your allergy filters.")
+                st.info("No snacks or drinks match your allergy filters.")
                 if st.button("Clear allergy filters", key="relax_snack_drink"):
                     st.session_state["_clear_allergy_pending"] = True
                     st.rerun()
             elif prefs.min_protein_g is not None or prefs.max_kcal is not None:
-                st.warning("No meal near you fits your protein / calorie limits.")
+                st.info("No meal near you fits your protein / calorie limits.")
                 if st.button("Clear nutrition limits", key="relax_nutrition"):
                     st.session_state["_clear_nutrition_pending"] = True
                     st.rerun()
             else:
-                st.warning("No meal combinations match your budget or preferences.")
+                st.info("No meal combinations match your budget or preferences.")
                 # Allergy filters are never cleared by a button that doesn't name them
                 if st.button("Clear diet & nutrition filters", key="relax_all"):
                     st.session_state["_clear_diet_pending"] = True
@@ -629,8 +585,6 @@ def screen_find(prefs: Preferences):
 
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
         st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
-
-        st.markdown(_allergy_box(), unsafe_allow_html=True)
 
         # Section A — featured best option
         _section_title("Your best option")
@@ -674,7 +628,8 @@ def screen_find(prefs: Preferences):
                    "[Open Food Facts](https://world.openfoodfacts.org) (ODbL), where our photo didn't show it.")
 
     with map_tab:
-        all_ranked = [primary] + alternatives + other_shops if primary else []
+        # For map rankings and markers, each shop has one primary featured lunch
+        all_ranked = [primary] + other_shops if primary else []
         for l in all_ranked:
             st.session_state[f"why_{l.shop.shop_id}"] = l.why or ""
         fmap = build_map(
@@ -686,14 +641,15 @@ def screen_find(prefs: Preferences):
             fmap,
             width=900,
             height=500,
-            returned_objects=["last_object_clicked", "last_object_clicked_tooltip"],
+            returned_objects=["last_object_clicked", "last_object_clicked_tooltip", "last_object_clicked_popup"],
         )
 
         # Detect clicked shop on map
-        selected_shop_id = st.session_state.get("map_selected_shop_id")
+        clicked_shop_id = None
         if map_data:
             clicked_obj = map_data.get("last_object_clicked")
             clicked_tooltip = map_data.get("last_object_clicked_tooltip") or ""
+            clicked_popup = map_data.get("last_object_clicked_popup") or ""
             if clicked_obj and isinstance(clicked_obj, dict):
                 clat = clicked_obj.get("lat")
                 clng = clicked_obj.get("lng")
@@ -703,13 +659,21 @@ def screen_find(prefs: Preferences):
                         None,
                     )
                     if match:
-                        selected_shop_id = match.shop_id
-                        st.session_state["map_selected_shop_id"] = match.shop_id
-            if not selected_shop_id and clicked_tooltip:
-                match = next((s for s in shops if s.name in clicked_tooltip), None)
+                        clicked_shop_id = match.shop_id
+            if not clicked_shop_id and clicked_tooltip:
+                match = next((s for s in shops if s.name.lower() in clicked_tooltip.lower()), None)
                 if match:
-                    selected_shop_id = match.shop_id
-                    st.session_state["map_selected_shop_id"] = match.shop_id
+                    clicked_shop_id = match.shop_id
+            if not clicked_shop_id and clicked_popup:
+                match = next((s for s in shops if s.name.lower() in str(clicked_popup).lower()), None)
+                if match:
+                    clicked_shop_id = match.shop_id
+
+        if clicked_shop_id:
+            st.session_state["map_selected_shop_id"] = clicked_shop_id
+            selected_shop_id = clicked_shop_id
+        else:
+            selected_shop_id = st.session_state.get("map_selected_shop_id")
 
         # Fallback to primary shop if nothing selected yet
         if not selected_shop_id and primary:
@@ -720,7 +684,6 @@ def screen_find(prefs: Preferences):
             sel_shop = next((s for s in shops if s.shop_id == selected_shop_id), None)
             sel_lunch = next((l for l in all_ranked if l.shop.shop_id == selected_shop_id), None)
             if sel_shop:
-                st.markdown("---")
                 with st.container(border=True):
                     mcol1, mcol2, mcol3 = st.columns([3, 2, 1])
                     with mcol1:
@@ -743,7 +706,7 @@ def screen_find(prefs: Preferences):
                             deal_str = "Meal deal" if sel_lunch.used_deal else "Bought separately"
                             st.caption(f"✅ {deal_str}")
                     with mcol3:
-                        if st.button("See basket →", key=f"map_see_basket_{sel_shop.shop_id}"):
+                        if st.button("View basket →", key=f"map_see_basket_{sel_shop.shop_id}"):
                             st.session_state["detail_shop_id"] = sel_shop.shop_id
                             if sel_lunch:
                                 st.session_state[f"why_{sel_shop.shop_id}"] = sel_lunch.why or ""
@@ -780,13 +743,11 @@ def _allergy_box_html() -> str:
 
 
 def _item_allergen_html(item) -> str:
-    """Serious-mode allergen line: values, their source, and the short warning."""
-    allergens = escape(", ".join(item.allergens)) if item.allergens else "Allergens not checked"
-    prefix = "Allergens: " if item.allergens else ""
-    source = item.external_fields.get("allergens")
-    via = f" ({escape(source)})" if source else ""
-    return (f'<div class="dl-allergen-line">{prefix}{allergens}{via} · '
-            f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div>')
+    """Allergen line: values without unchecked placeholder or source tag."""
+    if not item.allergens:
+        return ""
+    allergens = escape(", ".join(item.allergens))
+    return f'<div class="dl-allergen-line">Allergens: {allergens}</div>'
 
 
 def _price_html(item) -> str:
@@ -916,9 +877,6 @@ def screen_detail():
         pending = f"{key_prefix}_{cat}_pending"
         if pending in st.session_state:
             st.session_state[f"{key_prefix}_{cat}"] = st.session_state.pop(pending)
-
-    # Full allergy warning, always visible on the shop page
-    st.markdown(_allergy_box_html(), unsafe_allow_html=True)
 
     _heading(2, "Build your basket")
     picked = {}
@@ -1099,7 +1057,7 @@ def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
                     found += f", {len(entry['deals'])} meal deal sign(s)"
                 st.caption(f"Photo type: {entry['kind']} · found {found}")
                 if entry["notes"]:
-                    st.caption(f"⚠️ {entry['notes']}")
+                    st.caption(entry["notes"])
 
             if entry["items"]:
                 edited_items[idx] = st.data_editor(
@@ -1223,7 +1181,7 @@ def screen_upload():
 
     user_id = _ensure_user()
     if not user_id:
-        st.warning("Enter your username in the sidebar to earn credits.")
+        st.info("Enter your username in the sidebar to earn credits.")
 
     conn = _conn()
     shops_list = _load_data()[0]
@@ -1240,7 +1198,7 @@ def screen_upload():
     if flash := st.session_state.pop("upload_flash", None):
         st.success(flash[0])
         for problem in flash[1]:
-            st.warning(problem)
+            st.info(problem)
 
     # ── Shop + photo type ───────────────────────────────────────────────────
     if active_task:
@@ -1289,9 +1247,7 @@ def screen_upload():
     batch = st.session_state.get("upload_batch")
     if batch:
         _heading(2, "What we found")
-        st.caption("Check each product, fix anything wrong, untick anything that isn't right. "
-                   "Allergens are read by computer and must be checked against the pack.")
-        st.markdown(_allergy_box_html(), unsafe_allow_html=True)
+        st.caption("Check each product, fix anything wrong, untick anything that isn't right.")
         edited_items, edited_deals, banners = _render_batch(batch, nonce)
         n_ticked = sum(int(f["include"].sum()) for f in edited_items.values()) + \
                    sum(int(f["include"].sum()) for f in edited_deals.values())
@@ -1498,15 +1454,14 @@ def _record_line(row: dict) -> str:
     return (
         f'<div class="dl-record"><strong>{escape(row.get("name") or "")}</strong>{flag}'
         f'<div class="dl-record__meta">{escape(row.get("category") or "")} · {price}</div>'
-        f'<div class="dl-allergen-line">{allergen_text} · '
-        f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div></div>'
+        f'<div class="dl-allergen-line">{allergen_text}</div></div>'
     )
 
 
 def screen_review():
     _heading(1, "Review queue")
     if not is_admin():
-        st.warning("Team only. Unlock admin mode under **Team** at the bottom of the sidebar.")
+        st.info("Team only. Unlock admin mode under **Team** at the bottom of the sidebar.")
         return
     st.caption("Approve or reject submissions. Credits are paid to the submitter on approval.")
 
@@ -1624,12 +1579,20 @@ ADMIN_SCREENS = {"Review queue": "review"}
 
 def main():
 
-    # Direct navigation from URL query param (e.g. from map popup "See basket →" link)
-    shop_param = st.query_params.get("shop")
+    # Direct navigation from URL query param (e.g. from map popup "View basket →" link)
+    shop_param = st.query_params.get("shop") or st.query_params.get("detail_shop_id")
+    screen_param = st.query_params.get("screen")
     if shop_param:
-        del st.query_params["shop"]
+        for k in ("shop", "detail_shop_id", "screen"):
+            if k in st.query_params:
+                del st.query_params[k]
         st.session_state["detail_shop_id"] = shop_param
         st.session_state["screen"] = "detail"
+    elif screen_param:
+        if "screen" in st.query_params:
+            del st.query_params["screen"]
+        if screen_param in ("find", "detail", "credits", "review", "demo"):
+            st.session_state["screen"] = screen_param
 
     prefs = render_sidebar()
     render_admin_sidebar()
@@ -1662,7 +1625,6 @@ def main():
     screen = st.session_state["screen"]
 
     if screen == "find":
-        render_filter_bar(prefs)
         screen_find(prefs)
     elif screen == "detail":
         screen_detail()

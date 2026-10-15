@@ -68,7 +68,7 @@ def tokens_css() -> str:
 @lru_cache(maxsize=1)
 def page_css() -> str:
     """Everything the app needs: fonts @import first, then tokens, then component classes."""
-    components = COMPONENTS_CSS_PATH.read_text()
+    components = COMPONENTS_CSS_PATH.read_text(encoding="utf-8")
     imports = [l for l in components.splitlines() if l.startswith("@import")]
     rest = "\n".join(l for l in components.splitlines() if not l.startswith("@import"))
     return "\n".join(imports) + "\n" + tokens_css() + rest
@@ -76,7 +76,7 @@ def page_css() -> str:
 
 @lru_cache(maxsize=1)
 def _tokens() -> dict:
-    return json.loads(TOKENS_PATH.read_text())
+    return json.loads(TOKENS_PATH.read_text(encoding="utf-8"))
 
 
 def token(name: str) -> str:
