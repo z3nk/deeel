@@ -78,23 +78,23 @@ FALLBACK_ITEMS = [
      "last_seen": TODAY, "submitted_via": "seed", "confidence": "high"},
 
     # ── Sainsbury's ────────────────────────────────────────────────────────
-    {"item_id": "s-main-1", "shop_id": "sainsburys-tcr", "name": "Falafel & Houmous Wrap",
+    {"item_id": "s-main-1", "shop_id": "sainsburys-warren-st", "name": "Falafel & Houmous Wrap",
      "category": "main", "price_gbp": 3.00, "meal_deal_eligible": True,
      "temperature": "cold", "diet_flags": ["vegetarian", "vegan"],
      "allergens": ["gluten", "sesame"],
      "source_image": "fallback.jpg", "source_text": "£3.00 | vegan | gluten, sesame",
      "last_seen": TODAY, "submitted_via": "seed", "confidence": "high"},
-    {"item_id": "s-main-2", "shop_id": "sainsburys-tcr", "name": "Chicken Caesar Wrap",
+    {"item_id": "s-main-2", "shop_id": "sainsburys-warren-st", "name": "Chicken Caesar Wrap",
      "category": "main", "price_gbp": 3.20, "meal_deal_eligible": True,
      "temperature": "cold", "diet_flags": [], "allergens": ["gluten", "milk", "egg"],
      "source_image": "fallback.jpg", "source_text": "£3.20 | gluten, milk, egg",
      "last_seen": TODAY, "submitted_via": "seed", "confidence": "high"},
-    {"item_id": "s-snack-1", "shop_id": "sainsburys-tcr", "name": "Fruit Pot",
+    {"item_id": "s-snack-1", "shop_id": "sainsburys-warren-st", "name": "Fruit Pot",
      "category": "snack", "price_gbp": 1.25, "meal_deal_eligible": True,
      "temperature": "cold", "diet_flags": ["vegan"], "allergens": [],
      "source_image": "fallback.jpg", "source_text": "£1.25 | vegan",
      "last_seen": TODAY, "submitted_via": "seed", "confidence": "high"},
-    {"item_id": "s-drink-1", "shop_id": "sainsburys-tcr", "name": "Innocent Juice",
+    {"item_id": "s-drink-1", "shop_id": "sainsburys-warren-st", "name": "Innocent Juice",
      "category": "drink", "price_gbp": 1.60, "meal_deal_eligible": True,
      "temperature": "cold", "diet_flags": ["vegan"], "allergens": [],
      "source_image": "fallback.jpg", "source_text": "£1.60 | vegan",
@@ -242,7 +242,7 @@ FALLBACK_DEALS = [
     {"deal_id": "deal-tesco", "shop_id": "tesco-tcr", "name": "Meal Deal",
      "price_gbp": 4.25, "loyalty_price_gbp": 3.85, "loyalty_scheme": "Clubcard",
      "source_image": "fallback.jpg", "last_seen": TODAY},
-    {"deal_id": "deal-sainsburys", "shop_id": "sainsburys-tcr", "name": "Meal Deal",
+    {"deal_id": "deal-sainsburys", "shop_id": "sainsburys-warren-st", "name": "Meal Deal",
      "price_gbp": 3.95, "loyalty_price_gbp": None, "loyalty_scheme": None,
      "source_image": "fallback.jpg", "last_seen": TODAY},
     {"deal_id": "deal-waitrose", "shop_id": "waitrose-brunswick", "name": "Meal Deal",
@@ -333,11 +333,11 @@ def _infer_shop_id(filename: str) -> str | None:
     """
     Infer shop_id from filename prefix, e.g.:
         tesco_wrap.jpg      → tesco-tcr
-        sainsburys_deal.jpg → sainsburys-tcr
+        sainsburys_deal.jpg → sainsburys-warren-st
     """
     mapping = {
         "tesco": "tesco-tcr",
-        "sainsburys": "sainsburys-tcr",
+        "sainsburys": "sainsburys-warren-st",
         "waitrose": "waitrose-brunswick",
         "ms": "ms-tcr",
         "marks": "ms-tcr",

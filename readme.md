@@ -51,7 +51,7 @@ seed/inbox/<shop_id>/<general|main|snack|drink>/IMG_1234.jpg
 python seed/load_seed.py --inbox
 ```
 
-Shop IDs: `tesco-tcr`, `sainsburys-tcr`, `ms-tcr`, `lidl-tcr`, `waitrose-brunswick`, `pret-tcr` (the first run creates the empty folders). Each photo goes through the same pipeline as the app (upright, shrunk, location removed, HEIC ok, duplicates skipped), is read by Claude (4 at a time), and lands in the Review queue as **pending** — nothing is auto-approved. The date used is when the photo was taken. Originals are moved to `seed/inbox_done/`; failed photos stay in the inbox for a re-run. Products with no readable price are listed at the end instead of being queued.
+Shop IDs: `tesco-tcr`, `sainsburys-warren-st`, `ms-tcr`, `lidl-tcr`, `waitrose-brunswick`, `pret-tcr` (the first run creates the empty folders). Each photo goes through the same pipeline as the app (upright, shrunk, location removed, HEIC ok, duplicates skipped), is read by Claude (4 at a time), and lands in the Review queue as **pending** — nothing is auto-approved. The date used is when the photo was taken. Originals are moved to `seed/inbox_done/`; failed photos stay in the inbox for a re-run. Products with no readable price are listed at the end instead of being queued.
 
 ## Supported shops
 

@@ -167,14 +167,15 @@ _SEED_SHOPS = [
         "lng": -0.1353,
     },
     {
-        "shop_id": "sainsburys-tcr",
+        # Warren Street branch. Coordinates + walking time are estimates — confirm on the walk.
+        "shop_id": "sainsburys-warren-st",
         "chain": "sainsburys",
-        "name": "Sainsbury's Local",
-        "address": "Tottenham Court Road, London (confirm address on seed walk)",
-        "walking_minutes": 6.0,
-        "last_verified": "2026-10-12",
-        "lat": 51.5215,
-        "lng": -0.1351,
+        "name": "Sainsbury's Local (Warren Street)",
+        "address": "21 Hampstead Road, London NW1",
+        "walking_minutes": 5.0,
+        "last_verified": "2026-10-15",
+        "lat": 51.5261,
+        "lng": -0.1387,
     },
     {
         "shop_id": "waitrose-brunswick",
@@ -282,6 +283,7 @@ def _init_db(conn: sqlite3.Connection) -> None:
     _migrate(conn)
     _migrate_tasks(conn)
     _seed_shops(conn)
+    _rename_shops(conn)
     _seed_rewards(conn)
     _seed_tasks(conn)
     conn.commit()
@@ -348,13 +350,42 @@ def _auto_seed_items(conn: sqlite3.Connection) -> None:
         load_seed.load_fallback(conn)
 
 
+# Old shop_id → new shop_id. Rows in items/deals/tasks/uploads are moved across.
+_RENAMED_SHOPS = {"sainsburys-tcr": "sainsburys-warren-st"}
+
+
+def _rename_shops(conn: sqlite3.Connection) -> None:
+    """Run after _seed_shops (the new shop row must exist for the foreign keys)."""
+    for old, new in _RENAMED_SHOPS.items():
+        if conn.execute("SELECT 1 FROM shops WHERE shop_id = ?", (old,)).fetchone() is None:
+            continue
+        for table in ("items", "deals", "tasks"):
+            conn.execute(f"UPDATE {table} SET shop_id = ? WHERE shop_id = ?", (new, old))
+        for table in ("items", "deals"):
+            conn.execute(
+                f"UPDATE {table} SET source_image = ? || substr(source_image, ?) "
+                f"WHERE source_image LIKE ?",
+                (new + "/", len(old) + 2, old + "/%"),
+            )
+        conn.execute("DELETE FROM shops WHERE shop_id = ?", (old,))
+        old_dir = Path(__file__).parent / "uploads" / old
+        new_dir = Path(__file__).parent / "uploads" / new
+        if old_dir.exists() and not new_dir.exists():
+            old_dir.rename(new_dir)
+    conn.commit()
+
+
 def _seed_shops(conn: sqlite3.Connection) -> None:
     conn.executemany(
         """
-        INSERT OR IGNORE INTO shops
+        INSERT INTO shops
             (shop_id, chain, name, address, walking_minutes, last_verified, lat, lng)
         VALUES
             (:shop_id, :chain, :name, :address, :walking_minutes, :last_verified, :lat, :lng)
+        ON CONFLICT(shop_id) DO UPDATE SET
+            chain = excluded.chain, name = excluded.name, address = excluded.address,
+            walking_minutes = excluded.walking_minutes, last_verified = excluded.last_verified,
+            lat = excluded.lat, lng = excluded.lng
         """,
         _SEED_SHOPS,
     )

@@ -8,5 +8,5 @@ __pycache__/
 *.db-wal
 *.db-shm
 .claude/worktrees/
-seed/inbox/
+# Originals moved here after import keep their EXIF/GPS — never push them
 seed/inbox_done/
