@@ -12,6 +12,7 @@ Screens:
 from __future__ import annotations
 
 import json
+from html import escape
 from datetime import date, datetime
 from pathlib import Path
 
@@ -50,6 +51,7 @@ from optimiser import (
     shop_deal,
     lunch_deeel,
     hard_filter,
+    best_lunch_for_shop,
     _row_to_item,
     _row_to_shop,
     _row_to_deal,
@@ -514,6 +516,102 @@ def screen_find(prefs: Preferences):
 # Screen 2: Shop detail
 # ---------------------------------------------------------------------------
 
+def _heading(level: int, text: str, prefix_html: str = "") -> None:
+    """
+    Screen (1) / section (2) heading in the h1/h2 type tokens. A div with role=heading,
+    because Streamlit's own h1/h2 styles override the .dl-type-* sizes on real h tags.
+    """
+    type_class = {1: "dl-type-h1", 2: "dl-type-h2"}[level]
+    st.markdown(
+        f'<div class="{type_class}" role="heading" aria-level="{level}" '
+        f'style="margin:var(--space-4) 0 var(--space-2)">{prefix_html}{escape(text)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _bold_html(text: str) -> str:
+    """'**x**' → '<strong>x</strong>' for markdown copy reused inside HTML blocks."""
+    import re
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escape(text, quote=False))
+
+
+def _allergy_box_html() -> str:
+    """The full allergy warning as .dl-box--allergy (never dismissable, serious mode)."""
+    return f'<div class="dl-box dl-box--allergy">{_bold_html(ALLERGY_WARNING)}</div>'
+
+
+def _item_allergen_html(item) -> str:
+    """Serious-mode allergen line: values, their source, and the short warning."""
+    allergens = escape(", ".join(item.allergens)) if item.allergens else "Allergens not checked"
+    prefix = "Allergens: " if item.allergens else ""
+    source = item.external_fields.get("allergens")
+    via = f" ({escape(source)})" if source else ""
+    return (f'<div class="dl-allergen-line">{prefix}{allergens}{via} · '
+            f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div>')
+
+
+def _price_html(item) -> str:
+    if item.price_gbp is None:
+        return '<span class="dl-item__dealonly">meal deal only</span>'
+    return f'<span class="dl-item__price">£{item.price_gbp:.2f}</span>'
+
+
+def _item_info_html(item) -> str:
+    """Name, price, tags, allergens, nutrition and freshness under a shop-page picker."""
+    tags = []
+    if item.temperature == "hot":
+        tags.append('<span class="dl-item__meta">🔥 hot</span>')
+    if item.meal_deal_eligible is False:
+        tags.append('<span class="dl-item__meta">not in deal</span>')
+    if item.status == "pending":
+        tags.append('<span class="dl-badge dl-badge--unverified">Unverified</span>')
+    return (
+        f'<div class="dl-item">'
+        f'<div class="dl-item__name">{escape(item.name)}</div>'
+        f'<div class="dl-item__row">{_price_html(item)}{"".join(tags)}</div>'
+        f'{_item_allergen_html(item)}'
+        f'<div class="dl-item__meta">{escape(_item_nutrition(item))}</div>'
+        f'<div class="dl-item__row">{_freshness_badge(str(item.last_seen))}</div>'
+        f'</div>'
+    )
+
+
+def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: bool) -> str:
+    """DealComparison: meal deal vs bought separately; the winner has the border AND the words."""
+    if deal is None:
+        deal_body = '<div class="dl-compare__na">No deal at this shop</div>'
+    elif not deal_eligible:
+        deal_body = (f'<div class="dl-compare__na">Not available</div>'
+                     f'<div class="dl-compare__note">£{deal.price_gbp:.2f} deal — an item you picked '
+                     f"isn't in the meal deal.</div>")
+    else:
+        note = ""
+        if is_deal_better and sep_price is not None:
+            note = (f'<div class="dl-compare__note dl-compare__note--win">'
+                    f'✓ Best option — saves £{sep_price - deal.price_gbp:.2f}</div>')
+        elif is_deal_better:
+            note = '<div class="dl-compare__note dl-compare__note--win">✓ Best option</div>'
+        deal_body = f'<div class="dl-compare__price">£{deal.price_gbp:.2f}</div>{note}'
+
+    sep_win = not is_deal_better and sep_price is not None
+    if sep_price is None:
+        sep_body = ('<div class="dl-compare__na">Not available</div>'
+                    '<div class="dl-compare__note">An item you picked is only priced as part of the meal deal.</div>')
+    else:
+        sep_body = f'<div class="dl-compare__price">£{sep_price:.2f}</div>'
+        if sep_win:
+            sep_body += '<div class="dl-compare__note dl-compare__note--win">✓ Best option</div>'
+
+    deal_cls = "dl-compare__opt is-winner" if is_deal_better else "dl-compare__opt"
+    sep_cls = "dl-compare__opt is-winner" if sep_win else "dl-compare__opt"
+    return (
+        f'<div class="dl-compare">'
+        f'<div class="{deal_cls}"><div class="dl-compare__label">Meal deal price</div>{deal_body}</div>'
+        f'<div class="{sep_cls}"><div class="dl-compare__label">Bought separately</div>{sep_body}</div>'
+        f'</div>'
+    )
+
+
 def screen_detail():
     shops, all_items, deals = _load_data()
     shop_id = st.session_state.get("detail_shop_id")
@@ -533,16 +631,17 @@ def screen_detail():
     photo = storefront_path(shop)
     if photo is not None:
         st.image(str(photo))
-    st.markdown(f"<h2>{logo_html(shop, size=40)}{shop.name}</h2>", unsafe_allow_html=True)
+    _heading(1, shop.name, prefix_html=logo_html(shop, size=40))
     # Pull the why from the last ranked result for this shop if available
     why_text = st.session_state.get(f"why_{shop_id}", "")
-    if any(i.shop_id == shop_id and i.source_image == "fallback.jpg" for i in all_items):
-        st.info("**Sample data.** We haven't photographed this shop yet — the products and "
-                "prices below are placeholders, not real readings.")
     sub = f"{shop.walking_minutes:.0f} min walk from campus"
     if why_text:
         sub += f" · {why_text}"
     st.caption(sub)
+    if any(i.shop_id == shop_id and i.source_image == "fallback.jpg" for i in all_items):
+        st.markdown('<div class="dl-box dl-box--sample"><strong>Sample data</strong> — we haven\'t '
+                    'photographed this shop yet, so the products and prices below are placeholders, '
+                    'not real readings.</div>', unsafe_allow_html=True)
 
     # Items for this shop
     shop_items = [i for i in all_items if i.shop_id == shop_id and i.status in ("approved", "pending")]
@@ -555,6 +654,14 @@ def screen_detail():
         st.info("Not enough items to build a full basket for this shop yet.")
         return
 
+    # The pickers start at index 0 and "Reset to best basket" returns there, so put the
+    # shop's best lunch first (otherwise index 0 could be an unbuyable combination, e.g. a
+    # main outside the deal with a deal-only drink)
+    best = best_lunch_for_shop(shop, hard_filter(shop_items, Preferences()), shop_deals, Preferences())
+    if best is not None:
+        for options, pick in ((mains, best.main), (snacks, best.snack), (drinks, best.drink)):
+            options.sort(key=lambda i, pick=pick: i.item_id != pick.item_id)
+
     # Per-category dropdowns
     def _item_label(item) -> str:
         hot = " · hot" if item.temperature == "hot" else ""
@@ -564,71 +671,40 @@ def screen_detail():
 
     key_prefix = f"detail_{shop_id}"
 
-    # Apply any pending swaps from the catalogue table BEFORE widgets are instantiated
+    # Apply any pending swaps / resets BEFORE widgets are instantiated
+    # (writing a widget's key after it renders raises StreamlitAPIException)
     for cat in ("main", "snack", "drink"):
         pending = f"{key_prefix}_{cat}_pending"
         if pending in st.session_state:
             st.session_state[f"{key_prefix}_{cat}"] = st.session_state.pop(pending)
 
-    st.warning(ALLERGY_WARNING)
-    col1, col2, col3 = st.columns(3)
+    # Full allergy warning, always visible on the shop page
+    st.markdown(_allergy_box_html(), unsafe_allow_html=True)
 
-    with col1:
-        st.caption("MAIN")
-        main_idx = st.selectbox(
-            "Main", range(len(mains)),
-            format_func=lambda i: _item_label(mains[i]),
-            key=f"{key_prefix}_main",
-        )
-        main = mains[main_idx]
-        st.markdown(f"**{main.name}**")
-        if main.temperature == "hot":
-            st.caption("🔥 hot")
-        st.caption(_fmt_price(main))
-        st.caption(_allergen_text(main))
-        st.caption(_item_nutrition(main))
-        st.markdown(_freshness_badge(str(main.last_seen)), unsafe_allow_html=True)
-        if main.status == "pending":
-            st.caption("⚠️ Unverified")
-
-    with col2:
-        st.caption("SNACK")
-        snack_idx = st.selectbox(
-            "Snack", range(len(snacks)),
-            format_func=lambda i: _item_label(snacks[i]),
-            key=f"{key_prefix}_snack",
-        )
-        snack = snacks[snack_idx]
-        st.markdown(f"**{snack.name}**")
-        st.caption(_fmt_price(snack))
-        st.caption(_allergen_text(snack))
-        st.caption(_item_nutrition(snack))
-        st.markdown(_freshness_badge(str(snack.last_seen)), unsafe_allow_html=True)
-
-    with col3:
-        st.caption("DRINK")
-        drink_idx = st.selectbox(
-            "Drink", range(len(drinks)),
-            format_func=lambda i: _item_label(drinks[i]),
-            key=f"{key_prefix}_drink",
-        )
-        drink = drinks[drink_idx]
-        st.markdown(f"**{drink.name}**")
-        st.caption(_fmt_price(drink))
-        st.caption(_allergen_text(drink))
-        st.caption(_item_nutrition(drink))
-        st.markdown(_freshness_badge(str(drink.last_seen)), unsafe_allow_html=True)
+    _heading(2, "Build your basket")
+    picked = {}
+    for col, (cat, label, options) in zip(
+        st.columns(3),
+        (("main", "Main", mains), ("snack", "Snack", snacks), ("drink", "Drink", drinks)),
+    ):
+        with col:
+            st.markdown(f'<div class="dl-eyebrow">{label}</div>', unsafe_allow_html=True)
+            idx = st.selectbox(
+                label, range(len(options)),
+                format_func=lambda i, options=options: _item_label(options[i]),
+                key=f"{key_prefix}_{cat}",
+                label_visibility="collapsed",
+            )
+            picked[cat] = (idx, options[idx])
+            st.markdown(_item_info_html(options[idx]), unsafe_allow_html=True)
+    (main_idx, main), (snack_idx, snack), (drink_idx, drink) = picked["main"], picked["snack"], picked["drink"]
 
     # Reset button
-    default_idxs = (0, 0, 0)
-    current_idxs = (main_idx, snack_idx, drink_idx)
-    if current_idxs != default_idxs:
+    if (main_idx, snack_idx, drink_idx) != (0, 0, 0):
         if st.button("Reset to best basket"):
-            for k in [f"{key_prefix}_main", f"{key_prefix}_snack", f"{key_prefix}_drink"]:
-                st.session_state[k] = 0
+            for cat in ("main", "snack", "drink"):
+                st.session_state[f"{key_prefix}_{cat}_pending"] = 0
             st.rerun()
-
-    st.divider()
 
     # Pricing comparison
     sep_price = _separate_total([main, snack, drink])   # None = a deal-only item is picked
@@ -641,37 +717,13 @@ def screen_detail():
     deal_price = deal.price_gbp if deal else None
     is_deal_better = deal_price is not None and deal_eligible and (sep_price is None or deal_price < sep_price)
 
-    pc1, pc2 = st.columns(2)
-    with pc1:
-        with st.container(border=True):
-            st.caption("Meal deal price")
-            if deal is None:
-                st.markdown("**No deal at this shop**")
-            elif not deal_eligible:
-                st.markdown(f"**£{deal.price_gbp:.2f}** — not available")
-                st.caption("An item you picked isn't in the meal deal.")
-            else:
-                st.markdown(f"**£{deal.price_gbp:.2f}**")
-                if is_deal_better and sep_price is not None:
-                    st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
-                elif is_deal_better:
-                    st.caption("✅ Best option")
-
-    with pc2:
-        with st.container(border=True):
-            st.caption("Bought separately")
-            if sep_price is None:
-                st.markdown("**Not available**")
-                st.caption("An item you picked is only priced as part of the meal deal.")
-            else:
-                st.markdown(f"**£{sep_price:.2f}**")
-            if not is_deal_better and sep_price is not None:
-                st.caption("✅ Best option")
+    _heading(2, "Meal deal or separate?")
+    st.markdown(_deal_compare_html(deal, deal_eligible, sep_price, is_deal_better), unsafe_allow_html=True)
 
     st.divider()
 
     # Full catalogue table
-    st.markdown(f"#### Everything we've seen here")
+    _heading(2, "Everything we've seen here")
     st.caption(f"{len(shop_items)} items catalogued from photos")
 
     search = st.text_input("Search items", placeholder="e.g. wrap, vegan", key=f"{key_prefix}_search")
@@ -685,28 +737,29 @@ def screen_detail():
     ]
 
     for item in filtered:
-        days_old = (date.today() - date.fromisoformat(str(item.last_seen))).days
-        opacity = "0.4" if days_old > 14 else "1.0"
-        hot_tag = " · 🔥 hot" if item.temperature == "hot" else ""
-        nd_tag = " · *not in deal*" if item.meal_deal_eligible is False else ""
-        pend_tag = " · ⚠️ unverified" if item.status == "pending" else ""
-        allergens = _allergen_text(item).removeprefix("Allergens: ")
+        tags = [item.category]
+        if item.temperature == "hot":
+            tags.append("🔥 hot")
+        if item.meal_deal_eligible is False:
+            tags.append("not in deal")
+        unverified = (' <span class="dl-badge dl-badge--unverified">Unverified</span>'
+                      if item.status == "pending" else "")
 
-        row_cols = st.columns([3, 1, 1, 2, 1, 1])
+        # Stale rows are flagged by the "Seen Nd ago" badge, not dimmed (dimming fails contrast)
+        row_cols = st.columns([3, 1, 2, 1, 1])
         with row_cols[0]:
             st.markdown(
-                f'<div style="opacity:{opacity}"><b>{item.name}</b>{hot_tag}{nd_tag}{pend_tag}</div>',
+                f'<div class="dl-row"><strong>{escape(item.name)}</strong>{unverified}'
+                f'<div class="dl-row__tags">{" · ".join(tags)}</div></div>',
                 unsafe_allow_html=True,
             )
         with row_cols[1]:
-            st.caption(item.category.upper())
+            st.markdown(_price_html(item), unsafe_allow_html=True)
         with row_cols[2]:
-            st.markdown(_fmt_price(item))
+            st.markdown(_item_allergen_html(item), unsafe_allow_html=True)
         with row_cols[3]:
-            st.caption(allergens)
-        with row_cols[4]:
             st.markdown(_freshness_badge(str(item.last_seen)), unsafe_allow_html=True)
-        with row_cols[5]:
+        with row_cols[4]:
             cat = item.category
             options = {"main": mains, "snack": snacks, "drink": drinks}[cat]
             try:
@@ -922,7 +975,7 @@ def _submit_batch(conn, batch, edited_items, edited_deals, banners, user_id) -> 
 
 
 def screen_upload():
-    st.markdown("## Add photos")
+    _heading(1, "Add photos")
     st.info(
         "Pick the shop and what's in the photo, then upload one or many photos. "
         "One photo can cover a whole shelf — we'll pick out every product. "
@@ -953,9 +1006,11 @@ def screen_upload():
     # ── Shop + photo type ───────────────────────────────────────────────────
     if active_task:
         st.markdown(
-            f'<div style="border:var(--border-width-strong) solid var(--primary);border-radius:var(--radius-button);padding:var(--space-3);margin-bottom:var(--space-3)">'
-            f'<b>Task: {active_task["item_name"]}</b> at {shops_by_id.get(active_task["shop_id"], active_task["shop_id"])}<br>'
-            f'<span class="dl-type-small" style="color:var(--text-muted)">{active_task["ask"]}</span></div>',
+            f'<div class="dl-card dl-card--active">'
+            f'<div class="dl-card__row"><span class="dl-card__title">Task: {escape(active_task["item_name"])}</span>'
+            f'<span class="dl-badge dl-badge--credits">+{active_task["bonus_credits"]} credits once approved</span></div>'
+            f'<div class="dl-card__muted">{escape(shops_by_id.get(active_task["shop_id"], active_task["shop_id"]))}</div>'
+            f'<div class="dl-card__text">{escape(active_task["ask"])}</div></div>',
             unsafe_allow_html=True,
         )
         shop_id = active_task["shop_id"]
@@ -994,16 +1049,16 @@ def screen_upload():
 
     batch = st.session_state.get("upload_batch")
     if batch:
-        st.markdown("#### What we found")
+        _heading(2, "What we found")
         st.caption("Check each product, fix anything wrong, untick anything that isn't right. "
                    "Allergens are read by computer and must be checked against the pack.")
-        st.caption(ALLERGY_WARNING)
+        st.markdown(_allergy_box_html(), unsafe_allow_html=True)
         edited_items, edited_deals, banners = _render_batch(batch, nonce)
         n_ticked = sum(int(f["include"].sum()) for f in edited_items.values()) + \
                    sum(int(f["include"].sum()) for f in edited_deals.values())
         submit_label = f"Submit {n_ticked} for review"
         if active_task:
-            submit_label += f" — complete task (+{active_task['bonus_credits']} bonus credits)"
+            submit_label += f" — complete task (+{active_task['bonus_credits']} credits once approved)"
         sub_col, clear_col = st.columns([3, 1])
         with sub_col:
             if st.button(submit_label, type="primary", disabled=n_ticked == 0 and not banners, key="submit_batch"):
@@ -1027,8 +1082,8 @@ def screen_upload():
 
     # ── Task cards ──────────────────────────────────────────────────────────
     st.divider()
-    st.markdown("#### Tasks")
-    st.caption("We need a closer photo of these products. Bonus credits for each.")
+    _heading(2, "Tasks")
+    st.caption("We need a closer photo of these products. Bonus credits for each, once approved.")
 
     tasks = fetch_all_tasks(conn)
     if not tasks:
@@ -1041,28 +1096,21 @@ def screen_upload():
             is_active = task["task_id"] == st.session_state.get("active_task_id")
             shop_display = shops_by_id.get(task["shop_id"], task["shop_id"])
 
-            border = ("var(--border-width-strong) solid var(--primary)" if is_active
-                      else "var(--border-width-hairline) solid var(--border)")
-            bg = "var(--success-tint)" if is_done else ("var(--bg)" if is_active else "var(--surface)")
+            state = " dl-card--done" if is_done else (" dl-card--active" if is_active else "")
 
             with cols[i % 3]:
                 st.markdown(
-                    f'<div style="border:{border};border-radius:8px;background:{bg};padding:12px;margin-bottom:8px">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
-                    f'<b>{task["item_name"]}</b>'
-                    f'<span class="dl-badge dl-badge--credits">+{task["bonus_credits"]} credits</span>'
-                    f'</div>'
-                    f'<div class="dl-type-small" style="color:var(--text-muted)">{shop_display}</div>'
-                    f'<div class="dl-type-small" style="color:var(--text-muted)">Needed: {task["needed"]}</div>'
-                    f'<div class="dl-type-small" style="color:var(--text);margin-top:var(--space-1)">{task["ask"]}</div>'
+                    f'<div class="dl-card{state}">'
+                    f'<div class="dl-card__row"><span class="dl-card__title">{escape(task["item_name"])}</span>'
+                    f'<span class="dl-badge dl-badge--credits">+{task["bonus_credits"]} credits once approved</span></div>'
+                    f'<div class="dl-card__muted">{escape(shop_display)}</div>'
+                    f'<div class="dl-card__muted">Needed: {escape(task["needed"])}</div>'
+                    f'<div class="dl-card__text">{escape(task["ask"])}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
                 if is_done:
-                    st.markdown(
-                        '<span style="color:var(--success-ink);font-weight:700">Done ✓</span>',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown('<span class="dl-done">Done ✓</span>', unsafe_allow_html=True)
                 elif is_active:
                     st.caption("Upload above ↑")
                 else:
@@ -1076,7 +1124,7 @@ def screen_upload():
 # ---------------------------------------------------------------------------
 
 def screen_credits():
-    st.markdown("## My credits")
+    _heading(1, "My credits")
     user_id = _ensure_user()
     if not user_id:
         st.info("Enter your name in the sidebar to see your credits.")
@@ -1089,24 +1137,32 @@ def screen_credits():
 
     st.markdown(f"Hello, **{handle}**")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("Ready to spend", f"{balance} credits")
-    with c2:
-        st.metric("Awaiting review (estimate)", f"{pending_est} credits")
-        st.caption("0 credits until approved")
+    # Earned credits are hype (sticker); pending ones are never shown as earned
+    st.markdown(
+        f'<div class="dl-tiles">'
+        f'<div class="dl-tile dl-tile--earned"><div class="dl-tile__label">Ready to spend</div>'
+        f'<div class="dl-tile__value">{balance}</div><div class="dl-tile__note">credits</div></div>'
+        f'<div class="dl-tile dl-tile--pending"><div class="dl-tile__label">Awaiting review</div>'
+        f'<div class="dl-tile__value">{pending_est}</div>'
+        f'<div class="dl-tile__note">estimate · not earned yet — paid once approved</div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
     st.divider()
 
-    # Rewards
-    st.markdown("#### Rewards from sponsors")
+    # Rewards — kept visually separate from rankings
+    _heading(2, "Rewards from sponsors")
     rewards = conn.execute("SELECT * FROM rewards").fetchall()
     if rewards:
         for r in rewards:
             rc1, rc2 = st.columns([3, 1])
             with rc1:
-                st.markdown(f"**{r['title']}**")
-                st.caption(r["sponsor"])
+                st.markdown(
+                    f'<div class="dl-card__title">{escape(r["title"])}</div>'
+                    f'<div class="dl-card__muted">{escape(r["sponsor"])}</div>',
+                    unsafe_allow_html=True,
+                )
             with rc2:
                 can_afford = balance >= r["cost_credits"]
                 if st.button(
@@ -1127,7 +1183,7 @@ def screen_credits():
     st.divider()
 
     # History
-    st.markdown("#### History")
+    _heading(2, "History")
     history = ledger.get_credit_history(conn, user_id)
     if not history:
         st.caption("No credit events yet.")
@@ -1144,10 +1200,11 @@ def screen_credits():
                 return shops_map.get(row[0], row[0])
             return "—"
 
-        STATUS_COLOURS = {
-            "earn":     ("var(--success-ink)", "Approved"),
-            "spend":    ("var(--primary)", "Redeemed"),
-            "reversal": ("var(--danger)", "Not accepted"),
+        # .dl-status--<type> colours; the word always carries the meaning too
+        STATUS_LABELS = {
+            "earn":     "Approved",
+            "spend":    "Redeemed",
+            "reversal": "Not accepted",
         }
 
         hdr1, hdr2, hdr3 = st.columns([3, 2, 1])
@@ -1156,17 +1213,17 @@ def screen_credits():
         hdr3.caption("**Credits**")
 
         for event in history:
-            colour, label = STATUS_COLOURS.get(event["type"], ("var(--text-muted)", event["type"]))
+            kind = event["type"] if event["type"] in STATUS_LABELS else "other"
+            label = STATUS_LABELS.get(event["type"], event["type"])
             shop_name = _ref_to_shop(event["ref_id"]) if event.get("ref_id") else "—"
             sign = "+" if event["credits"] > 0 else ""
 
             c1, c2, c3 = st.columns([3, 2, 1])
             c1.markdown(shop_name)
-            c2.markdown(
-                f'<span style="color:{colour};font-weight:600">{label}</span>',
-                unsafe_allow_html=True,
-            )
-            c3.markdown(f"**{sign}{event['credits']}**")
+            c2.markdown(f'<span class="dl-status dl-status--{kind}">{escape(label)}</span>',
+                        unsafe_allow_html=True)
+            c3.markdown(f'<span class="dl-item__price">{sign}{event["credits"]}</span>',
+                        unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1189,20 +1246,26 @@ def _review(conn, records: list[dict], action: str) -> int:
 
 
 def _record_line(row: dict) -> str:
+    """One pending record as HTML: name + price, then a serious-mode allergen line."""
     if row["_type"] == "deal":
         card = f" · card £{row['loyalty_price_gbp']:.2f}" if row.get("loyalty_price_gbp") else ""
-        return f"**{row.get('name', 'Meal Deal')}** (deal sign) · £{row.get('price_gbp', 0):.2f}{card}"
+        return (f'<div class="dl-record"><strong>{escape(row.get("name") or "Meal Deal")}</strong> (deal sign) · '
+                f'<span class="dl-item__price">£{row.get("price_gbp", 0):.2f}</span>{card}</div>')
     allergens = json.loads(row.get("allergens") or "[]")
-    flag = " · ⚠️ unclear read" if row.get("needs_review") else ""
+    flag = ' <span class="dl-badge dl-badge--unverified">Unclear read</span>' if row.get("needs_review") else ""
+    price = ('<span class="dl-item__dealonly">meal deal only</span>' if row.get("price_gbp") is None
+             else f'<span class="dl-item__price">£{row["price_gbp"]:.2f}</span>')
+    allergen_text = f"Allergens: {escape(', '.join(allergens))}" if allergens else "Allergens not checked"
     return (
-        f"**{row.get('name', '')}** · {row.get('category', '').upper()} · "
-        f"{'meal deal only' if row.get('price_gbp') is None else f'£{row["price_gbp"]:.2f}'} · "
-        f"allergens: {', '.join(allergens) if allergens else 'not on label'} ({ALLERGY_WARNING_SHORT}){flag}"
+        f'<div class="dl-record"><strong>{escape(row.get("name") or "")}</strong>{flag}'
+        f'<div class="dl-record__meta">{escape(row.get("category") or "")} · {price}</div>'
+        f'<div class="dl-allergen-line">{allergen_text} · '
+        f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div></div>'
     )
 
 
 def screen_review():
-    st.markdown("## Review queue")
+    _heading(1, "Review queue")
     if not is_admin():
         st.warning("Team only. Unlock admin mode under **Team** at the bottom of the sidebar.")
         return
@@ -1276,14 +1339,16 @@ def screen_review():
             with info_col:
                 first = rows[0]
                 st.markdown(
-                    f"**{shops_map.get(first['shop_id'], first['shop_id'])}** · {len(rows)} from this photo"
+                    f'<div class="dl-card__title">{escape(shops_map.get(first["shop_id"], first["shop_id"]))}'
+                    f' · {len(rows)} from this photo</div>',
+                    unsafe_allow_html=True,
                 )
                 st.caption(
                     f"Uploaded by {first.get('submitted_by') or 'seed walk'} · {first.get('last_seen', '')} · `{photo}`"
                 )
                 for r in rows:
                     line_col, ap_col, rj_col = st.columns([6, 1, 1])
-                    line_col.markdown(_record_line(r))
+                    line_col.markdown(_record_line(r), unsafe_allow_html=True)
                     if ap_col.button("✓", key=f"approve_{r['_id']}", help="Approve"):
                         paid = _review(conn, [r], "approve")
                         st.session_state["review_flash"] = f"Approved {r.get('name')} — {paid} credits paid."
@@ -1328,13 +1393,16 @@ def main():
 
     # Top nav, with the "?" tour button as a narrow last column (top-right corner)
     nav_cols = st.columns([1] * len(screens) + [0.25])
+    # The shop page belongs to Find; the active screen's button is the primary one
+    current = {"detail": "find"}.get(st.session_state["screen"], st.session_state["screen"])
     for col, (label, key) in zip(nav_cols, screens.items()):
         with col:
-            if st.button(label, use_container_width=True):
+            if st.button(label, use_container_width=True, type="primary" if key == current else "secondary"):
                 st.session_state["screen"] = key
                 st.rerun()
     with nav_cols[-1]:
-        if st.button("?", key="open_demo", help="Take a live tour of the site", use_container_width=True):
+        if st.button("?", key="open_demo", help="Take a live tour of the site", use_container_width=True,
+                     type="primary" if current == "demo" else "secondary"):
             st.session_state["demo_step"] = 0
             st.session_state["screen"] = "demo"
             st.rerun()

@@ -99,3 +99,43 @@
 .dl-compare__na { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text-muted); }
 .dl-compare__note { font-size: 12px; line-height: 16px; margin-top: var(--space-1); }
 .dl-compare__note--win { color: var(--success-ink); font-weight: 600; }
+
+/* ── Shop page, upload, credits, review (screens beyond results) ─────────── */
+/* Eyebrow label above a picker or group ("MAIN", "SNACK", "DRINK") */
+.dl-eyebrow { font-family: var(--font-ui); font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-top: var(--space-3); }
+/* Item info under a shop-page picker */
+.dl-item { font-family: var(--font-ui); display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-1); }
+.dl-item__name { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text); }
+.dl-item__row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.dl-item__price { font-size: 14px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+.dl-item__dealonly { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-muted); }
+.dl-item__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+/* Catalogue row on the shop page */
+.dl-row { font-family: var(--font-ui); font-size: 14px; line-height: 20px; color: var(--text); }
+.dl-row__tags { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+/* Task / review cards: states */
+.dl-card--active { border: var(--border-width-strong) solid var(--primary); }
+.dl-card--done { background: var(--success-tint); }
+.dl-card__row { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.dl-card__title { font-family: var(--font-ui); font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text); }
+.dl-card__text { font-family: var(--font-ui); font-size: 12px; line-height: 16px; color: var(--text); margin-top: var(--space-1); }
+.dl-card__muted { font-family: var(--font-ui); font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-done { font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 700; color: var(--success-ink); }
+/* Credit balance tiles: earned (hype) vs awaiting review (never shown as earned) */
+.dl-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.dl-tile { background: var(--surface); border: var(--border-width-hairline) solid var(--border); border-radius: var(--radius-card); padding: var(--space-3) var(--space-4); font-family: var(--font-ui); }
+.dl-tile__label { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-tile__value { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+.dl-tile__note { font-size: 12px; line-height: 16px; color: var(--text-muted); margin-top: var(--space-1); }
+.dl-tile--earned { border: var(--border-width-strong) solid var(--text); background: var(--accent-yellow); box-shadow: var(--shadow-sticker); }
+.dl-tile--earned .dl-tile__label, .dl-tile--earned .dl-tile__note { color: var(--on-accent); }
+.dl-tile--pending .dl-tile__value { color: var(--text-muted); }
+/* Credit history status words (colour + the word itself) */
+.dl-status { font-family: var(--font-ui); font-size: 14px; line-height: 20px; font-weight: 600; }
+.dl-status--earn { color: var(--success-ink); }
+.dl-status--spend { color: var(--primary); }
+.dl-status--reversal { color: var(--danger); }
+.dl-status--other { color: var(--text-muted); }
+/* Review queue record line */
+.dl-record { font-family: var(--font-ui); font-size: 14px; line-height: 20px; color: var(--text); }
+.dl-record__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
