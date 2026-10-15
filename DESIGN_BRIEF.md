@@ -38,8 +38,8 @@ Neeam chose **B**. A and C are kept below for reference. The brand has to carry 
 
 ### Brand basics to define
 
-- **Wordmark / logo:** explore (1) wordmark with the three Es treated as a unit (stacked like price-tag lines, or as a "≡"-style triple bar), (2) a price-tag or shelf-edge-label icon containing "eee", (3) a sandwich/receipt monogram "D". Need: full wordmark, compact mark (works at 32 px as app/favicon), one-colour version, version on the primary green.
-- **Colour:** direction B calls for a saturated, high-contrast multi-colour palette. `#0F7B5F` (shipped theme) can stay as one of the colours or be replaced — Neeam to confirm. The semantic set (§5) — especially danger/allergen red — must stay distinct from the brand colours so warnings never look like decoration.
+- **Logo:** **a teammate is making the logo — do not design one.** Leave a logo slot in every layout and specify clear-space, minimum size and which backgrounds it may sit on; use a placeholder wordmark "Deeelicious" in the display face until the real logo arrives.
+- **Colour (decided):** keep **Deeel green `#0F7B5F`** as the anchor/primary, plus three saturated B accents: **sunshine yellow `#FFD23F`**, **electric violet `#7B2FF7`**, **cyan `#00C2FF`**. No pinks or reds in the brand palette, so danger/allergen red (§5) never reads as decoration. Refine shades for contrast (e.g. yellow and cyan carry dark text only), but keep the hues.
 - **Typography:** one display face (headlines, marketing, score numerals) + one UI face (must render well in Streamlit via Google Fonts or the system stack). Tabular numerals required for prices.
 - **Iconography:** simple line icons; needs: walk (minutes), hot/cold, meal deal, card/loyalty, camera/upload, credits, map pin, allergen warning, barcode, sample data, "?".
 - **Imagery:** real shelf photography (shot by us — see `uploads/`) over stock food photos; illustration only as accents. No photos of people's faces.
@@ -88,7 +88,7 @@ Return tokens that map 1:1 to `.streamlit/config.toml` + CSS custom properties (
 | `--surface` | Cards, sidebar | `#FFFFFF` |
 | `--border` | Card/input borders | `#E3E3DE` |
 | `--text` / `--text-muted` | Body / secondary | `#1F2328` / `#6B7280` |
-| `--accent` | New: marketing + highlights (e.g. savings) | — |
+| `--accent-yellow` / `--accent-violet` / `--accent-cyan` | B accents: savings, stickers, marketing | `#FFD23F` / `#7B2FF7` / `#00C2FF` (new) |
 | `--success` / `--warning` / `--danger` / `--info` | Semantic | `#16A34A` / `#D97706` / `#DC2626` / `#2563EB` |
 | `--allergen` | Active allergy chip, allergy warnings | `#DC2626` |
 | `--rank-1` / `--rank-2` / `--rank-3` / `--rank-out` | Map markers + rank badges | `#16A34A` / `#EAB308` / `#F97316` / `#94A3B8` |
@@ -97,7 +97,7 @@ Return tokens that map 1:1 to `.streamlit/config.toml` + CSS custom properties (
 | `--sample` | Sample-data badge (dashed outline) | `#475569` on `#F1F5F9` |
 | `--unverified` | Pending/unverified tag | `#2563EB` |
 
-Note: `--rank-2` yellow `#EAB308` fails contrast with white text — fix in the system. Provide **light and dark** variants (Streamlit supports both base themes).
+Note: `--rank-2` yellow `#EAB308` fails contrast with white text — fix in the system. **Light theme only** — no dark mode for launch.
 
 ### Other tokens
 
@@ -152,7 +152,7 @@ Design each with its states. Names match the code so we can map them back.
 
 - **Realistic:** theme tokens in `config.toml` (primary, background, secondary background, text, font, plus light/dark); custom HTML/CSS injected via `st.markdown(..., unsafe_allow_html=True)` for badges, pills, cards and headings; `st.container(border=True)` cards; `st.columns` (max 3 across); tabs, popovers, expanders, `st.pills`, data editor, sliders, toggles; Google Fonts via a `<link>`/`@import`.
 - **Avoid unless clearly worth it:** custom JS components, drag and drop, overlapping/floating elements, complex animation, pixel-perfect layouts (Streamlit's spacing is only partly controllable).
-- **Mobile-first (change from v3):** students use this on phones in shops. Streamlit collapses the sidebar on mobile, so design **how controls work on a 390 px screen** — e.g. a compact top filter bar or "Filters" sheet, with the allergy chips reachable in one tap. Desktop (1280 px) is the secondary layout.
+- **Mobile-first (change from v3, confirmed by Neeam):** students use this on phones in shops. Streamlit collapses the sidebar on mobile, so design **how controls work on a 390 px screen** — e.g. a compact top filter bar or "Filters" sheet, with the allergy chips reachable in one tap. Desktop (1280 px) is the secondary layout.
 - **Performance:** the page reruns on every control change; keep images to thumbnails and the single storefront banner.
 
 ---
@@ -161,9 +161,9 @@ Design each with its states. Names match the code so we can map them back.
 
 Same tokens, typography and logo as the app.
 
-- **Logo lockups:** horizontal, stacked, mark-only, on light/dark/primary.
-- **Instagram post (1080×1080) and story (1080×1920) templates:** price-comparison card ("Meal deal vs separate"), "Deeel of the day" (one result card), "New shop photographed", "Earn credits" call-to-action.
-- **A3 campus poster** (UCL noticeboards, Student Centre) with QR code to the live app.
+- **Logo placement rules** for the teammate's logo (slot, clear-space, backgrounds) — no logo design.
+- **Instagram post (1080×1080) and story (1080×1920) templates:** price-comparison card ("Meal deal vs separate"), "Deeel of the day" (one result card), "New shop photographed", "Earn credits" call-to-action, and **rewards / sponsor** posts ("Spend your credits on…", with a sponsor-logo slot).
+- **A3 campus poster** with QR code to the live app. **No UCL or Students' Union logos, crests, colours or branding** anywhere in the kit.
 - **Landing page hero** (desktop + mobile): headline, sub, phone screenshot, "Find my lunch" CTA.
 - **Pitch deck template** (16:9): title, problem, demo screenshot, how the Deeel score works, data/trust, team.
 - **App screenshot frames** (phone + laptop) for the above.
@@ -176,19 +176,19 @@ Same tokens, typography and logo as the app.
 - "Six shops. Ten minutes. One best lunch."
 - "Snap a shelf, earn credits."
 
-Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos, no implied partnerships.
+Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos, no UCL / Students' Union branding, no implied partnerships. Sponsor slots are fine but must stay visually separate from rankings ("sponsors never affect ranking").
 
 ---
 
 ## 10. What to send back
 
-1. **Brand:** chosen direction with rationale, logo files (SVG + PNG), colour palette, type pairing.
+1. **Brand:** direction B applied — colour palette (built on the decided hues), type pairing, logo placement rules (no logo design).
 2. **Tokens** as both a table and JSON, e.g.
    ```json
    {"color": {"primary": "#0F7B5F", "bg": "#F7F7F4", "surface": "#FFFFFF", "text": "#1F2328", "...": "..."},
     "font": {"display": "...", "ui": "..."}, "radius": {"chip": 999, "card": 12}, "space": [4, 8, 12, 16, 24, 32]}
    ```
-   plus the exact `config.toml` `[theme]` block (light and dark) and a CSS `:root` variables block.
+   plus the exact `config.toml` `[theme]` block (light only) and a CSS `:root` variables block.
 3. **Component sheet** for §6 with states, annotated with the Streamlit element each maps to.
 4. **Screens** for §7 at 390 px (primary) and 1280 px.
 5. **Marketing templates** from §9.
@@ -196,12 +196,12 @@ Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos
 
 ---
 
-## 11. Open questions for Neeam
+## 11. Decisions (answered by Neeam)
 
-1. ~~Brand direction~~ — decided: **B, "Snack hype"** (with safety surfaces kept serious).
-2. Keep `#0F7B5F` as one of the brand colours, or let the B palette replace it?
-3. Is the triple-E device the hero of the logo, or should the logo lead with food (sandwich/receipt)?
-4. Mobile-first now — OK to redesign how filters work on phones (moving away from the sidebar)?
-5. Should rewards/sponsor slots appear in marketing at all while sponsors are placeholders?
-6. Dark mode: required for launch or later?
-7. Any UCL/Students' Union branding rules for posters on campus?
+1. Brand direction: **B, "Snack hype"**, with safety surfaces kept calm and serious.
+2. Colour: **Deeel green `#0F7B5F` + sunshine yellow `#FFD23F`, electric violet `#7B2FF7`, cyan `#00C2FF`**; no pinks/reds in the brand palette.
+3. Logo: **made by a teammate** — Claude Design provides placement rules only.
+4. Filters on phones: **OK to redesign** away from the sidebar.
+5. Rewards / sponsor slots in marketing: **yes**, kept separate from rankings.
+6. Dark mode: **not for launch** — light theme only.
+7. University branding: **none** — no UCL or Students' Union logos, crests, colours or names as branding.
