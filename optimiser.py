@@ -285,6 +285,14 @@ def score_lunch(
 DEEEL_SHORTLIST = 4   # per category, per criterion (cheapest / best ingredients / most protein)
 
 
+SAMPLE_IMAGE = "fallback.jpg"   # placeholder rows from seed/load_seed.py FALLBACK_ITEMS
+
+
+def is_sample(lunch: Lunch) -> bool:
+    """True if any item in the meal is placeholder (sample) data, not from a real photo."""
+    return any(i.source_image == SAMPLE_IMAGE for i in (lunch.main, lunch.snack, lunch.drink))
+
+
 def shop_deal(deals: list[Deal], shop_id: str) -> Optional[Deal]:
     """
     The shop's meal deal. A sign is usually photographed many times, with the odd

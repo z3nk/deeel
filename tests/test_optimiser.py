@@ -398,3 +398,11 @@ def test_shop_deal_uses_most_frequently_read_sign():
     assert shop_deal(deals, "shop-a").price_gbp == 4.25
     assert shop_deal(deals, "shop-b").price_gbp == 5.0
     assert shop_deal(deals, "shop-c") is None
+
+
+def test_is_sample_flags_placeholder_meals():
+    from optimiser import is_sample
+    real = best_lunch_for_shop(SHOP_A, ITEMS_A, [], Preferences())
+    assert not is_sample(real)
+    placeholder = real.main.model_copy(update={"source_image": "fallback.jpg"})
+    assert is_sample(real.model_copy(update={"main": placeholder}))

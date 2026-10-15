@@ -15,7 +15,7 @@ import math
 import folium
 
 from models import Lunch, Shop
-from optimiser import WALK_SPEED_MPM
+from optimiser import WALK_SPEED_MPM, is_sample
 from shop_images import logo_html
 
 # UCL Main Quad, Gower Street
@@ -101,11 +101,12 @@ def build_map(
             rank, lunch = ranked_index[shop.shop_id]
             colour = _rank_colour(rank)
             deal_label = "Meal deal" if lunch.used_deal else "Separate"
+            sample_note = "<br><i>Sample data — not photographed yet</i>" if is_sample(lunch) else ""
             popup_html = (
                 f"{logo_html(shop, size=22)}<b>#{rank} {shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
-                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}"
+                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}"
             )
         else:
             colour = COLOUR_GREY
@@ -124,7 +125,8 @@ def build_map(
             fill_opacity=0.85,
             weight=2,
             popup=folium.Popup(popup_html, max_width=220),
-            tooltip=shop.name,
+            tooltip=shop.name + (" (sample data)" if shop.shop_id in ranked_index
+                                 and is_sample(ranked_index[shop.shop_id][1]) else ""),
         ).add_to(m)
 
         # Rank label on the marker

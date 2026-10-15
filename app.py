@@ -45,6 +45,7 @@ from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
     get_results,
+    is_sample,
     shop_deal,
     lunch_deeel,
     hard_filter,
@@ -341,11 +342,17 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         with col1:
             rank_str = f"#{rank} " if rank > 0 else ""
             badge = ' <span style="background:#0F7B5F;color:white;font-size:10px;padding:2px 8px;border-radius:999px">Best match</span>' if featured else ""
+            if is_sample(lunch):
+                badge += (' <span style="background:#F1F5F9;color:#475569;border:1px dashed #94A3B8;font-size:10px;'
+                          'padding:2px 8px;border-radius:999px">Sample data</span>')
             st.markdown(
                 f"{logo_html(lunch.shop)}<b>{rank_str}{lunch.shop.name}</b>{badge}",
                 unsafe_allow_html=True,
             )
             st.caption(f"{lunch.shop.walking_minutes:.0f} min walk")
+            if is_sample(lunch):
+                st.caption("⚠️ Sample data — we haven't photographed this shop yet, so these "
+                           "products and prices are placeholders.")
             st.markdown(
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}"
             )
@@ -510,6 +517,9 @@ def screen_detail():
     st.markdown(f"<h2>{logo_html(shop, size=40)}{shop.name}</h2>", unsafe_allow_html=True)
     # Pull the why from the last ranked result for this shop if available
     why_text = st.session_state.get(f"why_{shop_id}", "")
+    if any(i.shop_id == shop_id and i.source_image == "fallback.jpg" for i in all_items):
+        st.info("**Sample data.** We haven't photographed this shop yet — the products and "
+                "prices below are placeholders, not real readings.")
     sub = f"{shop.walking_minutes:.0f} min walk from campus"
     if why_text:
         sub += f" · {why_text}"
