@@ -1,0 +1,81 @@
+/* Deeelicious — generated from tokens.json by theme.py */
+:root {
+  --primary: #0f7b5f;
+  --primary-tint: #e7f2ee;
+  --on-primary: #ffffff;
+  --accent-yellow: #ffd23f;
+  --accent-violet: #7b2ff7;
+  --accent-cyan: #00c2ff;
+  --on-accent: var(--text);
+  --bg: #f7f7f4;
+  --surface: #ffffff;
+  --border: #e3e3de;
+  --border-strong: #8a8f98;
+  --text: #1f2328;
+  --text-muted: #6b7280;
+  --success: #16a34a;
+  --success-ink: #15803d;
+  --success-tint: #f0fdf4;
+  --warning: #d97706;
+  --warning-ink: #b45309;
+  --warning-tint: #fffbeb;
+  --danger: #dc2626;
+  --info: #2563eb;
+  --info-tint: #eff6ff;
+  --allergen: #dc2626;
+  --allergen-ink: #b91c1c;
+  --allergen-tint: #fef2f2;
+  --rank-1: #16a34a;
+  --rank-2: #eab308;
+  --rank-3: #f97316;
+  --rank-out: #94a3b8;
+  --rank-ink: var(--text);
+  --score-high: #15803d;
+  --score-mid: #b45309;
+  --score-low: #64748b;
+  --fresh: #15803d;
+  --ageing: #b45309;
+  --stale: #475569;
+  --sample: #475569;
+  --sample-tint: #f1f5f9;
+  --sample-outline: #94a3b8;
+  --unverified: #2563eb;
+  --shop-tesco: #00539f;
+  --shop-sainsburys: #f06c00;
+  --shop-waitrose: #5c8018;
+  --shop-marks-and-spencer: #1e1e1e;
+  --shop-lidl: #0050aa;
+  --shop-pret: #862633;
+  --on-shop-light: #ffffff;
+  --on-shop-dark: var(--text);
+  --on-shop-lidl: #fff000;
+  --shop-fallback: #94a3b8;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-badge: 6px;
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-chip: 999px;
+  --shadow-raised: 0 1px 2px rgba(31, 35, 40, 0.08);
+  --shadow-sticker: 3px 3px 0 #1f2328;
+  --border-width-hairline: 1px;
+  --border-width-strong: 2px;
+  --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-ui: Figtree, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.dl-type-display { font-family: var(--font-display); font-size: 56px; line-height: 56px; font-weight: 800; letter-spacing: -0.02em; }
+.dl-type-score-numeral { font-family: var(--font-display); font-size: 40px; line-height: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dl-type-h1 { font-family: var(--font-display); font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.01em; }
+.dl-type-h2 { font-family: var(--font-display); font-size: 20px; line-height: 26px; font-weight: 700; }
+.dl-type-price { font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dl-type-h3 { font-family: var(--font-ui); font-size: 16px; line-height: 22px; font-weight: 700; }
+.dl-type-body { font-family: var(--font-ui); font-size: 14px; line-height: 20px; font-weight: 400; }
+.dl-type-body-strong { font-family: var(--font-ui); font-size: 14px; line-height: 20px; font-weight: 600; }
+.dl-type-price-sm { font-family: var(--font-ui); font-size: 14px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dl-type-label { font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 600; }
+.dl-type-small { font-family: var(--font-ui); font-size: 12px; line-height: 16px; font-weight: 400; }
+.dl-type-caption { font-family: var(--font-ui); font-size: 11px; line-height: 14px; font-weight: 600; }
