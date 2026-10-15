@@ -389,3 +389,12 @@ def test_build_item_requires_price_or_meal_deal():
     with pytest.raises(ValueError):
         build_item({"name": "Wrap", "category": "main", "price_gbp": None, "meal_deal_eligible": None,
                     "confidence": "high"}, "shop-a", "x.jpg", _d(2026, 10, 15), None)
+
+
+def test_shop_deal_uses_most_frequently_read_sign():
+    from optimiser import shop_deal
+    deals = [_deal(f"good{i}", "shop-a", 4.25) for i in range(5)] + [_deal("misread", "shop-a", 3.0),
+                                                                     _deal("other", "shop-b", 5.0)]
+    assert shop_deal(deals, "shop-a").price_gbp == 4.25
+    assert shop_deal(deals, "shop-b").price_gbp == 5.0
+    assert shop_deal(deals, "shop-c") is None

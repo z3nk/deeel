@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections import Counter
 from datetime import date, timedelta
 from typing import Optional
 
@@ -284,6 +285,20 @@ def score_lunch(
 DEEEL_SHORTLIST = 4   # per category, per criterion (cheapest / best ingredients / most protein)
 
 
+def shop_deal(deals: list[Deal], shop_id: str) -> Optional[Deal]:
+    """
+    The shop's meal deal. A sign is usually photographed many times, with the odd
+    misread, so take the most frequently seen (name, price, card price); ties → the
+    most recently seen. Standard "Meal Deal" beats "Premium Meal Deal".
+    """
+    candidates = [d for d in deals if d.shop_id == shop_id]
+    if not candidates:
+        return None
+    standard = [d for d in candidates if d.name == "Meal Deal"] or candidates
+    counts = Counter((d.name, d.price_gbp, d.loyalty_price_gbp) for d in standard)
+    return max(standard, key=lambda d: (counts[(d.name, d.price_gbp, d.loyalty_price_gbp)], str(d.last_seen)))
+
+
 def _deal_price(deal: Deal, prefs: Preferences) -> float:
     if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp:
         return deal.loyalty_price_gbp
@@ -336,7 +351,7 @@ def _deeel_lunch(shop, main, snack, drink, deal, prefs) -> Optional[Lunch]:
 
 def _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs) -> list[Lunch]:
     """Best Deeel lunch for each main at this shop, best first."""
-    deal = next((d for d in deals if d.shop_id == shop.shop_id), None)
+    deal = shop_deal(deals, shop.shop_id)
     snacks, drinks = _shortlist(snacks, prefs), _shortlist(drinks, prefs)
     results = []
     for main in mains:
@@ -409,9 +424,8 @@ def best_lunch_for_shop(
         )
 
     # ---- Deal mode ----
-    shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
-    if shop_deals:
-        deal = shop_deals[0]  # use the first (best) deal; could rank if multiple
+    deal = shop_deal(deals, shop.shop_id)
+    if deal is not None:
         deal_price = (
             deal.loyalty_price_gbp
             if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp
@@ -507,7 +521,7 @@ def top_lunches_for_shop(
         return _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs)[:n]
 
     p_max = prefs.max_price_gbp or P_MAX_DEFAULT
-    shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
+    the_deal = shop_deal(deals, shop.shop_id)
 
     def _item_score(item: Item) -> float:
         w_p, w_q, w_h = _weights_from_sort(prefs)
@@ -522,8 +536,8 @@ def top_lunches_for_shop(
         """(price, used_deal, deal) for this trio, or None if it can't be bought within the cap."""
         sep_price = _separate_price((main, best_snack, best_drink), prefs)
         price, used_deal, deal_obj = sep_price, False, None
-        if shop_deals and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
-            d = shop_deals[0]
+        if the_deal and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
+            d = the_deal
             dp = d.loyalty_price_gbp if (prefs.has_clubcard or prefs.has_nectar) and d.loyalty_price_gbp else d.price_gbp
             if (sep_price is None or dp < sep_price) and dp <= p_max:
                 price, used_deal, deal_obj = dp, True, d

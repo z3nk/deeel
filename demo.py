@@ -15,7 +15,7 @@ from streamlit_folium import st_folium
 
 from map_view import build_map
 from models import Preferences
-from optimiser import get_results
+from optimiser import get_results, shop_deal
 from shop_images import logo_html
 
 GREEN = "#0F7B5F"
@@ -177,7 +177,7 @@ def _step_deal(data, render_card) -> None:
     shop = primary.shop
     trio = (primary.main, primary.snack, primary.drink)
     sep_price = None if any(i.price_gbp is None for i in trio) else sum(i.price_gbp for i in trio)
-    deal = next((d for d in deals if d.shop_id == shop.shop_id), None)
+    deal = shop_deal(deals, shop.shop_id)
     eligible = all(i.meal_deal_eligible for i in trio)
     st.markdown(
         f"{logo_html(shop)}At <b>{shop.name}</b>: {' + '.join(i.name for i in trio)}",

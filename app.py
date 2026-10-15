@@ -45,6 +45,7 @@ from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
     get_results,
+    shop_deal,
     lunch_deeel,
     hard_filter,
     _row_to_item,
@@ -609,7 +610,7 @@ def screen_detail():
         and snack.meal_deal_eligible is not False
         and drink.meal_deal_eligible is not False
     )
-    deal = shop_deals[0] if shop_deals else None
+    deal = shop_deal(shop_deals, shop_id)
     deal_price = deal.price_gbp if deal else None
     is_deal_better = deal_price is not None and deal_eligible and (sep_price is None or deal_price < sep_price)
 
