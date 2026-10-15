@@ -12,7 +12,9 @@ Screens:
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
+import re
+from html import escape
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import streamlit as st
@@ -261,9 +263,10 @@ def _allergen_line(items_list, avoid: list[str]) -> str:
 
 def _nutrition_line(items_list) -> str:
     """'1,040 kcal · 31 g protein' for the meal, or '' if any value is missing."""
-    if any(f in i.external_fields for i in items_list for f in ("kcal", "protein_g")):
-        return _nutrition_line_plain(items_list) + " · partly from Open Food Facts / other photos"
-    return _nutrition_line_plain(items_list)
+    plain = _nutrition_line_plain(items_list)
+    if plain and any(f in i.external_fields for i in items_list for f in ("kcal", "protein_g")):
+        return plain + " · partly from Open Food Facts / other photos"
+    return plain
 
 
 def _nutrition_line_plain(items_list) -> str:
@@ -326,96 +329,118 @@ def _deeel_band(total: int) -> str:
     return "low"
 
 
-def _render_deeel(lunch, prefs: Preferences) -> None:
-    """Deeel score badge + a popover with the weighted breakdown."""
+def _render_deeel_breakdown(lunch, d) -> None:
+    """The "How it's scored" popover body: weighted parts + per-item ingredient reasons."""
+    for k, weight in DEEEL_WEIGHTS.items():
+        pts = weight * d.parts[k]
+        st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
+    st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
+               "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
+               "The main counts double.")
+    for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
+        a = assess_ingredients(item.ingredients_text)
+        via = f" · ingredients from {item.external_fields['ingredients_text']}" \
+            if "ingredients_text" in item.external_fields else ""
+        st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}{via}")
+    if d.partial:
+        st.caption("Some label info is missing. Unknown nutrition scores half marks; "
+                   "unknown ingredients score below an average label.")
+
+
+def _md_bold(text: str) -> str:
+    """**bold** → <strong> for text placed inside raw HTML (markdown isn't parsed there)."""
+    return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+
+
+def _allergy_box() -> str:
+    """Full allergy warning as the AllergyWarning box (never dismissable)."""
+    return f'<div class="dl-box dl-box--allergy" role="note">{_md_bold(ALLERGY_WARNING)}</div>'
+
+
+def _allergen_line_html(items_list) -> str:
+    """Allergen line with the short warning styled per AllergyWarning (serious mode)."""
+    text = _allergen_line(items_list, []).removesuffix(f" · {ALLERGY_WARNING_SHORT}")
+    return (f'<div class="dl-allergen-line dl-card__note">{escape(text)} · '
+            f'<span class="dl-allergen-line__warn">{ALLERGY_WARNING_SHORT}</span></div>')
+
+
+def _deal_html(lunch) -> str:
+    """Deal state for the price row. The savings sticker is the only hype element on the card."""
+    sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink])
+    if lunch.used_deal and sep_price is None:
+        return '<span class="dl-plain-deal">Meal deal — some items are only priced as part of the deal</span>'
+    if lunch.used_deal and sep_price > lunch.price_gbp:
+        return (f'<span class="dl-card__strike">£{sep_price:.2f} separately</span>'
+                f'<span class="dl-sticker">Meal deal saves £{sep_price - lunch.price_gbp:.2f}</span>')
+    return '<span class="dl-plain-deal">Bought separately — no deal</span>'
+
+
+def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False,
+                       key_prefix: str = "", show_rank: bool = True):
+    """
+    ResultCard (design/components/ResultCard): one bordered container holding one HTML
+    block, plus the "How it's scored" popover and the "See basket →" button.
+    show_rank=False for Section B (alternatives at the same shop), per the spec.
+    """
+    trio = [lunch.main, lunch.snack, lunch.drink]
+    sample = is_sample(lunch)
     d = lunch_deeel(lunch, prefs)
-    badge_col, info_col = st.columns([1, 2])
-    with badge_col:
-        st.markdown(
-            f'<span class="dl-score dl-score--{_deeel_band(d.total)}">Deeel {d.total}</span>',
-            unsafe_allow_html=True,
-        )
-    with info_col.popover("How it's scored"):
-        for k, weight in DEEEL_WEIGHTS.items():
-            pts = weight * d.parts[k]
-            st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
-        st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
-                   "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
-                   "The main counts double.")
-        for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
-            a = assess_ingredients(item.ingredients_text)
-            via = f" · ingredients from {item.external_fields['ingredients_text']}" \
-                if "ingredients_text" in item.external_fields else ""
-            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}{via}")
-        if d.partial:
-            st.caption("Some label info is missing. Unknown nutrition scores half marks; "
-                       "unknown ingredients score below an average label.")
 
+    top = []
+    if show_rank and rank > 0:
+        top.append(f'<span class="dl-card__rank dl-card__rank--{min(rank, 3)}" '
+                   f'aria-label="Rank {rank}">{rank}</span>')
+    top.append(logo_html(lunch.shop))
+    top.append(f'<span class="dl-card__name">{escape(lunch.shop.name)}</span>')
+    if featured:
+        top.append('<span class="dl-badge dl-badge--best">Best match</span>')
+    if sample:
+        top.append('<span class="dl-badge dl-badge--sample">Sample data</span>')
+    top.append(f'<span class="dl-card__walk">{lunch.shop.walking_minutes:.0f} min walk</span>')
 
-def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):
-    from models import Lunch
+    body = [f'<div class="dl-card__top">{"".join(top)}</div>']
+    if sample:
+        body.append('<div class="dl-card__meta dl-card__note" style="color:var(--sample)">'
+                    "⚠️ Sample data — we haven't photographed this shop yet, so these "
+                    "products and prices are placeholders.</div>")
+    body.append(f'<div class="dl-card__basket">{escape(" + ".join(i.name for i in trio))}</div>')
+    nutrition = _nutrition_line(trio)
+    if nutrition:
+        body.append(f'<div class="dl-card__meta">{escape(nutrition)}</div>')
+    body.append(_allergen_line_html(trio))
+    if lunch.why:
+        body.append(f'<div class="dl-card__meta dl-card__note"><em>{escape(lunch.why)}</em></div>')
 
+    price_cls = "dl-card__price" if featured else "dl-card__price dl-card__price--sm"
+    body.append(f'<div class="dl-card__price-row"><span class="{price_cls}">£{lunch.price_gbp:.2f}</span>'
+                f'{_deal_html(lunch)}</div>')
+
+    oldest = max(
+        ((date.today() - date.fromisoformat(i.last_seen)).days for i in trio if isinstance(i.last_seen, str)),
+        default=0,
+    )
+    fresh = _freshness_badge((date.today() - timedelta(days=oldest)).isoformat())
+    body.append(f'<div class="dl-card__foot"><span class="dl-score dl-score--{_deeel_band(d.total)}">'
+                f'Deeel {d.total}</span>{fresh}</div>')
+
+    card_cls = "dl-card dl-card--in-st" + (" dl-card--featured" if featured else "")
     with st.container(border=True):
-        col1, col2, col3 = st.columns([3, 2, 1])
-        with col1:
-            rank_str = f"#{rank} " if rank > 0 else ""
-            badge = ' <span class="dl-badge dl-badge--best">Best match</span>' if featured else ""
-            if is_sample(lunch):
-                badge += ' <span class="dl-badge dl-badge--sample">Sample data</span>'
-            st.markdown(
-                f"{logo_html(lunch.shop)}<b>{rank_str}{lunch.shop.name}</b>{badge}",
-                unsafe_allow_html=True,
-            )
-            st.caption(f"{lunch.shop.walking_minutes:.0f} min walk")
-            if is_sample(lunch):
-                st.caption("⚠️ Sample data — we haven't photographed this shop yet, so these "
-                           "products and prices are placeholders.")
-            st.markdown(
-                f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}"
-            )
-            st.markdown(
-                _allergen_line([lunch.main, lunch.snack, lunch.drink], prefs.allergens_exclude),
-                unsafe_allow_html=True,
-            )
-            _render_deeel(lunch, prefs)
-            nutrition = _nutrition_line([lunch.main, lunch.snack, lunch.drink])
-            if nutrition:
-                st.caption(nutrition)
-            if lunch.why:
-                st.caption(f"*{lunch.why}*")
-
-        with col2:
-            sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink])
-            st.markdown(f"### £{lunch.price_gbp:.2f}")
-            if lunch.used_deal and sep_price is None:
-                st.caption("✅ Meal deal — some items are only priced as part of the deal")
-            elif lunch.used_deal and sep_price > lunch.price_gbp:
-                st.markdown(
-                    f'<span class="dl-card__strike">£{sep_price:.2f} separately</span>',
-                    unsafe_allow_html=True,
-                )
-                st.caption(f"✅ Meal deal saves £{sep_price - lunch.price_gbp:.2f}")
-            else:
-                st.caption("Bought separately — no deal")
-            # Freshness
-            oldest = max(
-                (
-                    (date.today() - date.fromisoformat(i.last_seen)).days
-                    for i in [lunch.main, lunch.snack, lunch.drink]
-                    if isinstance(i.last_seen, str)
-                ),
-                default=0,
-            )
-            st.markdown(_freshness_badge(
-                (date.today() - __import__("datetime").timedelta(days=oldest)).isoformat()
-            ), unsafe_allow_html=True)
-
-        with col3:
-            if st.button("See basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}"):
+        st.markdown(f'<div class="{card_cls}">{"".join(body)}</div>', unsafe_allow_html=True)
+        score_col, basket_col = st.columns(2)
+        with score_col.popover("How it's scored", use_container_width=True):
+            _render_deeel_breakdown(lunch, d)
+        with basket_col:
+            if st.button("See basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}",
+                         use_container_width=True):
                 st.session_state["detail_shop_id"] = lunch.shop.shop_id
                 st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
                 st.session_state["screen"] = "detail"
                 st.rerun()
+
+
+def _section_title(text: str) -> None:
+    st.markdown(f'<div class="dl-type-h2 dl-section-title" role="heading" aria-level="2">'
+                f'{escape(text)}</div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -456,22 +481,21 @@ def screen_find(prefs: Preferences):
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
         st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
 
-        st.caption(ALLERGY_WARNING)
+        st.markdown(_allergy_box(), unsafe_allow_html=True)
 
         # Section A — featured best option
-        st.markdown("#### Your best option")
+        _section_title("Your best option")
         render_result_card(primary, rank=1, prefs=prefs, featured=True)
 
-        # Section B — alternatives at same shop
+        # Section B — alternatives at same shop (no rank badge, per the ResultCard spec)
         if alternatives:
-            st.markdown(f"#### More at {primary.shop.name}")
+            _section_title(f"More at {primary.shop.name}")
             for i, alt in enumerate(alternatives, start=2):
-                render_result_card(alt, rank=i, prefs=prefs, featured=False)
+                render_result_card(alt, rank=i, prefs=prefs, featured=False, show_rank=False)
 
         # Section C — other shops
         if other_shops:
-            st.divider()
-            st.markdown("#### Other nearby shops")
+            _section_title("Other nearby shops")
             for i, lunch in enumerate(other_shops, start=len(alternatives) + 2):
                 render_result_card(lunch, rank=i, prefs=prefs, featured=False)
 
@@ -486,16 +510,16 @@ def screen_find(prefs: Preferences):
                        and (date.today() - date.fromisoformat(i.last_seen)).days > 14]
         stale_shop_ids = {i.shop_id for i in stale_items} - all_ranked_ids
         if stale_shop_ids:
-            st.caption("Not ranked — last seen over 14 days ago")
-            for shop in shops:
-                if shop.shop_id in stale_shop_ids:
-                    st.markdown(
-                        f'<div style="opacity:0.4;border:var(--border-width-hairline) solid var(--border);border-radius:var(--radius-button);'
-                        f'padding:12px;margin-bottom:8px">'
-                        f'{logo_html(shop, size=20)}<b>{shop.name}</b> · {shop.walking_minutes:.0f} min walk · '
-                        f'<span style="color:var(--text-muted)">Data too old</span></div>',
-                        unsafe_allow_html=True,
-                    )
+            # Stale card (ResultCard spec): sample-tint, no opacity dimming (that failed contrast)
+            cards = "".join(
+                f'<div class="dl-card dl-card--stale"><div class="dl-card__top">{logo_html(shop, size=20)}'
+                f'<span class="dl-card__name">{escape(shop.name)}</span>'
+                f'<span class="dl-badge dl-badge--stale">Data too old</span>'
+                f'<span class="dl-card__walk">{shop.walking_minutes:.0f} min walk</span></div>'
+                f'<div class="dl-card__meta" style="color:var(--stale)">Not ranked — last seen over 14 days ago</div></div>'
+                for shop in shops if shop.shop_id in stale_shop_ids
+            )
+            st.markdown(f'<div class="dl-stale-list">{cards}</div>', unsafe_allow_html=True)
 
         st.caption("Sponsors never affect ranking. Some nutrition data from "
                    "[Open Food Facts](https://world.openfoodfacts.org) (ODbL), where our photo didn't show it.")
