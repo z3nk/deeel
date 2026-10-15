@@ -108,15 +108,29 @@ def build_map(
                 f"{logo_html(shop, size=22, standalone=True)}<b>#{rank} {shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
-                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}"
+                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}<br>"
+                f'<div style="margin-top:8px;">'
+                f'<a href="/?shop={shop.shop_id}" target="_blank" style="'
+                f'display:inline-block;padding:5px 12px;background:#0F7B5F;color:#ffffff;'
+                f'text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;'
+                f'">See basket ↗</a>'
+                f'</div>'
             )
+            marker_tooltip = f"#{rank} {shop.name}" + (" (sample data)" if is_sample(lunch) else "")
         else:
             colour = COLOUR_GREY
             popup_html = (
                 f"{logo_html(shop, size=22, standalone=True)}<b>{shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
-                f"<i>Outside your filters</i>"
+                f"<i>Outside your filters</i><br>"
+                f'<div style="margin-top:8px;">'
+                f'<a href="/?shop={shop.shop_id}" target="_blank" style="'
+                f'display:inline-block;padding:5px 12px;background:#0F7B5F;color:#ffffff;'
+                f'text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;'
+                f'">See basket ↗</a>'
+                f'</div>'
             )
+            marker_tooltip = shop.name
 
         folium.CircleMarker(
             location=[shop.lat, shop.lng],
@@ -124,11 +138,10 @@ def build_map(
             color=colour,
             fill=True,
             fill_color=colour,
-            fill_opacity=0.85,
+            fill_opacity=0.9,
             weight=2,
-            popup=folium.Popup(popup_html, max_width=220),
-            tooltip=shop.name + (" (sample data)" if shop.shop_id in ranked_index
-                                 and is_sample(ranked_index[shop.shop_id][1]) else ""),
+            popup=folium.Popup(popup_html, max_width=240),
+            tooltip=marker_tooltip,
         ).add_to(m)
 
         # Rank label on the marker
@@ -136,6 +149,8 @@ def build_map(
             rank, _ = ranked_index[shop.shop_id]
             folium.Marker(
                 location=[shop.lat, shop.lng],
+                popup=folium.Popup(popup_html, max_width=240),
+                tooltip=marker_tooltip,
                 icon=folium.DivIcon(
                     html=f'<div style="{type_css("caption")};font-weight:700;color:{token("rank-ink")};'
                          f'text-align:center;line-height:24px;">{rank}</div>',

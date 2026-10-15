@@ -72,7 +72,7 @@ Every lunch combo receives an objective **Deeel score** out of 100 based entirel
 - **Processing Markers**: Penalises industrial additives typical of ultra-processed food (artificial colours, chemical preservatives, emulsifiers/thickeners, flavour enhancers, artificial sweeteners, modified starches, flavourings, glucose syrups, and hydrogenated fats).
 - **Safe Additives Ignored**: Harmless antioxidants, vitamin C, citric acid, and natural leavening agents are not penalised.
 - **Short Ingredients Lists**: Whole-food recipes with fewer ingredients score higher.
-- Tap the **"How it's scored"** button on any recommendation card to see a transparent breakdown of points and ingredient notes.
+- Hover or tap the **Deeel score** badge on any recommendation card to see a transparent breakdown of points and ingredient notes.
 
 ---
 

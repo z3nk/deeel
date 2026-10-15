@@ -22,7 +22,7 @@ Temperature = Literal["hot", "cold", "ambient"]
 Status = Literal["pending", "approved", "rejected"]
 Confidence = Literal["high", "medium", "low"]
 SubmittedVia = Literal["seed", "upload"]
-LoyaltyScheme = Literal["Clubcard", "Nectar", "other"]
+LoyaltyScheme = Literal["Clubcard", "Nectar", "Lidl Plus", "Sparks", "myWaitrose", "Club Pret", "other"]
 DealName = Literal["Meal Deal", "Premium Meal Deal"]
 Sort = Literal["deeel", "quality", "distance", "price"]
 TemperaturePref = Literal["any", "hot", "cold"]
@@ -90,7 +90,7 @@ class Item(BaseModel):
     meal_deal_eligible: Optional[bool] = None   # null = unknown
     temperature: Temperature
     diet_flags: List[str] = Field(default_factory=list)   # only from label text
-    allergens: List[str] = Field(default_factory=list)    # only from label text
+    allergens: Optional[List[str]] = Field(default_factory=list)    # only from label text. [] = none; None = unknown
     ingredients_text: Optional[str] = None
     # Meat/fish named on the label (name or ingredients). [] = none; None = unknown
     meats: Optional[List[str]] = None
@@ -205,5 +205,9 @@ class Preferences(BaseModel):
     # Loyalty card toggle
     has_clubcard: bool = False
     has_nectar: bool = False
+    has_lidl_plus: bool = False
+    has_sparks: bool = False
+    has_mywaitrose: bool = False
+    has_club_pret: bool = False
 
     model_config = {"frozen": True}
