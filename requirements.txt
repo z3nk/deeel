@@ -1,5 +1,6 @@
 streamlit>=1.38.0
 anthropic>=0.34.0
+brotli>=1.2.0        # older Brotli breaks the Anthropic SDK's response decoding
 pydantic>=2.8.0
 pillow>=10.4.0
 pillow-heif>=0.18.0
