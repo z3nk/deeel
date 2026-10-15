@@ -16,5 +16,6 @@ Drop photos into `<shop>/<general|main|snack|drink>/` (on GitHub: open the folde
 Then someone pulls and runs `python seed/load_seed.py --inbox`. Everything lands in the Review queue as pending.
 
 **This repo is public.** Photos here are visible to anyone and stay in git history.
-Before uploading: turn off location for the photos (iPhone share sheet → Options → Location off,
+**Before committing photos from a computer, run `python seed/load_seed.py --strip-gps`** — it removes GPS from every inbox photo without changing the image or its date.
+When uploading through the GitHub website that isn't possible, so instead: turn off location for the photos (iPhone share sheet → Options → Location off,
 or Settings → Privacy → Location Services → Camera → Never), and avoid people's faces.

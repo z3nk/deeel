@@ -10,6 +10,7 @@ Usage:
     python seed/load_seed.py            # auto-detects photos; falls back if none found
     python seed/load_seed.py --fallback # force fallback data regardless of photos
     python seed/load_seed.py --reset    # wipe items/deals tables first, then load
+    python seed/load_seed.py --strip-gps  # remove GPS from inbox JPEGs before committing them
     python seed/load_seed.py --inbox    # import seed/inbox/<shop_id>/<general|main|snack|drink>/
                                         # photos as PENDING for the Review queue (see importer.py)
 """
@@ -361,7 +362,17 @@ if __name__ == "__main__":
     parser.add_argument("--reset", action="store_true", help="Wipe items/deals tables before loading")
     parser.add_argument("--inbox", action="store_true",
                         help="Import photos from seed/inbox/<shop_id>/<type>/ as pending for review")
+    parser.add_argument("--strip-gps", action="store_true",
+                        help="Remove GPS from JPEGs in seed/inbox/ (lossless) before committing them")
     args = parser.parse_args()
+
+    if args.strip_gps:
+        from photo_store import strip_gps_in_place
+        inbox = SEED_DIR / "inbox"
+        photos = [p for p in inbox.rglob("*") if p.suffix.lower() in (".jpg", ".jpeg")]
+        stripped = sum(strip_gps_in_place(p) for p in photos)
+        print(f"Removed GPS from {stripped} of {len(photos)} photo(s) in {inbox}.")
+        sys.exit(0)
 
     conn = get_connection()
 

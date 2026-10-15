@@ -125,3 +125,21 @@ def test_build_deal_normalises_unknown_values():
     deal = build_deal({"name": "Lunch thing", "price_gbp": 4, "loyalty_scheme": "Advantage"},
                       "tesco-tcr", "tesco-tcr/general/x.jpg", date(2026, 10, 15), None)
     assert deal.name == "Meal Deal" and deal.loyalty_scheme is None
+
+
+def test_strip_gps_in_place_is_lossless(tmp_path):
+    import hashlib
+    import piexif
+    path = tmp_path / "shelf.jpg"
+    path.write_bytes(_jpeg(gps=True))
+    exif = piexif.load(str(path))
+    exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = b"2026:10:15 14:09:38"
+    piexif.insert(piexif.dump(exif), str(path))
+    pixels = hashlib.sha256(Image.open(path).tobytes()).hexdigest()
+
+    assert photo_store.strip_gps_in_place(path) is True
+    img = Image.open(path)
+    assert not img.getexif().get_ifd(0x8825)
+    assert hashlib.sha256(img.tobytes()).hexdigest() == pixels            # no re-encode
+    assert piexif.load(str(path))["Exif"][piexif.ExifIFD.DateTimeOriginal] == b"2026:10:15 14:09:38"
+    assert photo_store.strip_gps_in_place(path) is False                   # nothing left to strip

@@ -83,6 +83,25 @@ def save_photo(shop_id: str, photo_type: str, data: bytes, today: date | None = 
     return SavedPhoto(path, path.relative_to(UPLOAD_ROOT).as_posix(), False)
 
 
+def strip_gps_in_place(path: Path) -> bool:
+    """
+    Remove GPS (and the EXIF thumbnail) from a JPEG WITHOUT re-encoding it: pixels
+    and the photo-taken date are untouched. For photos committed to the inbox.
+    Returns True if GPS was removed, False if there was none.
+    """
+    import piexif
+
+    exif = piexif.load(str(path))
+    if not exif.get("GPS") and piexif.ImageIFD.GPSTag not in exif["0th"]:
+        return False
+    exif["GPS"] = {}
+    exif["0th"].pop(piexif.ImageIFD.GPSTag, None)
+    exif.pop("thumbnail", None)
+    exif["1st"] = {}
+    piexif.insert(piexif.dump(exif), str(path))
+    return True
+
+
 def set_storefront(shop_id: str, photo: Path) -> Path:
     """Use a general photo as this shop's banner on the shop page."""
     target = photo_dir(shop_id, "general") / "storefront.jpg"
