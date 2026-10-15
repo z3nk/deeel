@@ -101,7 +101,7 @@ def _ensure_user():
 
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
 DIETS     = ["Vegetarian", "Vegan", "Halal", "Kosher"]
-MEATS     = ["No meat", "Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
+MEATS     = ["Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
 
 
@@ -144,13 +144,13 @@ def render_sidebar() -> Preferences:
     certified = [d.lower() for d in diet_flags if d in ("Halal", "Kosher")]
     if certified:
         st.sidebar.caption(f"Only mains with a printed {' / '.join(certified)} label are shown.")
-    meats = st.sidebar.multiselect(
+    meats = st.sidebar.pills(
         "Meat in main",
         MEATS,
+        selection_mode="multi",
         key="meats_allowed",
-        placeholder="Any",
-        help="Only show mains whose label lists these meats. Pick 'No meat' for meat-free.",
-    )
+        help="Only show mains whose label lists these meats. None picked = any.",
+    ) or []
     st.sidebar.divider()
 
     # Nutrition — whole meal totals
@@ -196,7 +196,7 @@ def render_sidebar() -> Preferences:
         max_walking_minutes=float(walk_limit),
         diet_flags=[d.lower() for d in diet_flags],
         allergens_exclude=[a.lower() for a in avoid],
-        meats_allowed=["none" if m == "No meat" else m.lower() for m in meats],
+        meats_allowed=[m.lower() for m in meats],
         min_protein_g=float(min_protein) if min_protein else None,
         max_kcal=float(max_kcal) if max_kcal < KCAL_CAP else None,
         has_clubcard=loyalty,
