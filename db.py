@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     item_name     TEXT NOT NULL,        -- what to photograph
     needed        TEXT NOT NULL,        -- e.g. "price + allergens"
     ask           TEXT NOT NULL,        -- instruction shown to the user
+    photo_type    TEXT NOT NULL DEFAULT 'main',  -- main / snack / drink / general
     bonus_credits INTEGER NOT NULL DEFAULT 5
 );
 
@@ -207,6 +208,7 @@ _SEED_TASKS = [
         "shop_id": "tesco-tcr",
         "item_name": "Meal deal price board",
         "needed": "current deal price",
+        "photo_type": "general",
         "ask": "Photograph the full meal deal sign so the price is sharp and readable.",
         "bonus_credits": 15,
     },
@@ -215,6 +217,7 @@ _SEED_TASKS = [
         "shop_id": "pret-tcr",
         "item_name": "Chicken Caesar Wrap",
         "needed": "price + allergens",
+        "photo_type": "main",
         "ask": "Get the front label in frame. Make sure the allergen box is visible.",
         "bonus_credits": 10,
     },
@@ -223,6 +226,7 @@ _SEED_TASKS = [
         "shop_id": "ms-tcr",
         "item_name": "Percy Pig sweets",
         "needed": "price + meal deal eligibility",
+        "photo_type": "snack",
         "ask": "Photograph the shelf edge label. Check if there's a meal deal sticker.",
         "bonus_credits": 10,
     },
@@ -276,6 +280,7 @@ def get_connection() -> sqlite3.Connection:
 def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
     _migrate(conn)
+    _migrate_tasks(conn)
     _seed_shops(conn)
     _seed_rewards(conn)
     _seed_tasks(conn)
@@ -288,6 +293,19 @@ _ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL"}
 # Bump when FALLBACK_ITEMS/FALLBACK_* data in seed/load_seed.py changes, so existing
 # databases (including the deployed one) drop and reload their fallback rows.
 FALLBACK_DATA_VERSION = 2
+
+
+def _migrate_tasks(conn: sqlite3.Connection) -> None:
+    """Add tasks.photo_type to older DBs and fill it for the seeded tasks."""
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(tasks)")}
+    if "photo_type" in existing:
+        return
+    conn.execute("ALTER TABLE tasks ADD COLUMN photo_type TEXT NOT NULL DEFAULT 'main'")
+    conn.executemany(
+        "UPDATE tasks SET photo_type = :photo_type WHERE task_id = :task_id",
+        _SEED_TASKS,
+    )
+    conn.commit()
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -358,9 +376,9 @@ def _seed_tasks(conn: sqlite3.Connection) -> None:
     conn.executemany(
         """
         INSERT OR IGNORE INTO tasks
-            (task_id, shop_id, item_name, needed, ask, bonus_credits)
+            (task_id, shop_id, item_name, needed, ask, photo_type, bonus_credits)
         VALUES
-            (:task_id, :shop_id, :item_name, :needed, :ask, :bonus_credits)
+            (:task_id, :shop_id, :item_name, :needed, :ask, :photo_type, :bonus_credits)
         """,
         _SEED_TASKS,
     )

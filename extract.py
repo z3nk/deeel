@@ -15,6 +15,7 @@ import base64
 import json
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -316,6 +317,175 @@ def extract_deal(
                 raise RuntimeError(
                     f"extract_deal failed after 2 attempts for {image_path.name}: {exc}"
                 ) from exc
+
+
+# ---------------------------------------------------------------------------
+# Multi-product photos (upload screen)
+# ---------------------------------------------------------------------------
+
+_PHOTO_SYSTEM = _ITEM_SYSTEM + """
+7. A photo may show MANY products (a whole shelf, several packs). Return one entry
+   per distinct product you can identify. Never merge two products into one entry,
+   and never invent a product you can't see.
+8. Match each price to its product using the shelf-edge label directly below or
+   beside it. If you can't tell which price belongs to a product, set price_gbp to
+   null rather than guessing.
+"""
+
+_PHOTO_PROMPT = """
+Shop ID: {shop_id}. The person filed this photo as: {photo_type_desc}.
+{category_rule}
+
+Return a JSON object with exactly these fields:
+{{
+  "kind": "<storefront | shelf | product | deal_sign | other>",
+  "notes": "<one short sentence on anything unreadable or ambiguous, else empty>",
+  "items": [
+    {{
+      "name": "<product name from the pack or label>",
+      "category": "<main | snack | drink>",
+      "price_gbp": <number or null if not readable / not matchable>,
+      "loyalty_price_gbp": <number or null>,
+      "meal_deal_eligible": <true | false | null>,
+      "temperature": "<hot | cold | ambient>",
+      "diet_flags": ["<only if explicitly printed>"],
+      "allergens": ["<only if explicitly printed>"],
+      "ingredients_text": "<see rule 3a2, or null>",
+      "meats": ["<see rule 3a>"] or null,
+      "kcal": <number per pack or null>,
+      "protein_g": <number per pack or null>,
+      "premium_range": <true | false | null>,
+      "source_text": "<exact label wording used for price, diet flags and allergens>",
+      "confidence": "<high | medium | low>"
+    }}
+  ],
+  "deals": [
+    {{
+      "name": "<Meal Deal | Premium Meal Deal>",
+      "price_gbp": <number>,
+      "loyalty_price_gbp": <number or null>,
+      "loyalty_scheme": "<Clubcard | Nectar | other | null>"
+    }}
+  ]
+}}
+Use [] for items or deals when there are none (e.g. a storefront photo).
+"""
+
+_TYPE_DESC = {
+    "main": "a MAIN (sandwich, wrap, salad, pasta pot, soup, hot food)",
+    "snack": "a SNACK (crisps, fruit, chocolate, yoghurt, nuts, sweets)",
+    "drink": "a DRINK",
+    "general": "a GENERAL shop photo (storefront, meal deal sign, or a mixed shelf)",
+}
+
+
+@dataclass
+class PhotoExtraction:
+    kind: str
+    notes: str
+    items: list[dict]      # product fields only; caller adds ids/shop/source and validates
+    deals: list[dict]
+
+
+def extract_photo(image_path: Path, shop_id: str, photo_type: str) -> PhotoExtraction:
+    """
+    Read every product (and any meal deal sign) in one photo.
+    Returns raw dicts so the upload screen can show them for editing before they
+    become Item/Deal records. Retries once on a JSON parse failure.
+    """
+    if photo_type in ("main", "snack", "drink"):
+        category_rule = (
+            f"Only extract {photo_type.upper()} products and set category to "
+            f'"{photo_type}". Ignore other products in the background. '
+            "Still report any meal deal sign in deals."
+        )
+    else:
+        category_rule = "Extract every product of any category, and any meal deal sign."
+
+    prompt = _PHOTO_PROMPT.format(
+        shop_id=shop_id,
+        photo_type_desc=_TYPE_DESC[photo_type],
+        category_rule=category_rule,
+    )
+    data, media_type = _encode_image(Path(image_path))
+
+    for attempt in range(2):
+        try:
+            response = _get_client().messages.create(
+                model=MODEL,
+                max_tokens=8192,
+                system=_PHOTO_SYSTEM,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+            )
+            raw = _extract_json(response.content[0].text)
+            items = [i for i in raw.get("items") or [] if isinstance(i, dict) and i.get("name")]
+            if photo_type in ("main", "snack", "drink"):
+                for i in items:
+                    i["category"] = photo_type
+            return PhotoExtraction(
+                kind=raw.get("kind") or "other",
+                notes=raw.get("notes") or "",
+                items=items,
+                deals=[d for d in raw.get("deals") or [] if isinstance(d, dict) and d.get("price_gbp")],
+            )
+        except (json.JSONDecodeError, ValueError) as exc:
+            if attempt == 1:
+                raise RuntimeError(f"extract_photo failed after 2 attempts for {Path(image_path).name}: {exc}") from exc
+
+
+def build_item(fields: dict, shop_id: str, source_rel: str, photo_date: date,
+               submitted_by: str | None, submitted_via: str = "upload") -> Item:
+    """Turn one (possibly user-edited) extracted product into a validated pending Item."""
+    confidence = fields.get("confidence") if fields.get("confidence") in ("high", "medium", "low") else "medium"
+    return Item(
+        item_id=str(uuid.uuid4())[:8],
+        shop_id=shop_id,
+        name=fields["name"],
+        category=fields["category"],
+        price_gbp=float(fields["price_gbp"]),
+        loyalty_price_gbp=fields.get("loyalty_price_gbp"),
+        meal_deal_eligible=fields.get("meal_deal_eligible"),
+        temperature=fields.get("temperature") or "ambient",
+        diet_flags=[f.lower() for f in fields.get("diet_flags") or []],
+        allergens=[a.lower() for a in fields.get("allergens") or []],
+        ingredients_text=fields.get("ingredients_text"),
+        meats=fields.get("meats"),
+        kcal=fields.get("kcal"),
+        protein_g=fields.get("protein_g"),
+        premium_range=fields.get("premium_range"),
+        source_image=source_rel,
+        source_text=fields.get("source_text") or "",
+        last_seen=photo_date,
+        submitted_via=submitted_via,
+        submitted_by=submitted_by,
+        status="pending",
+        confidence=confidence,
+        needs_review=confidence != "high",
+    )
+
+
+def build_deal(fields: dict, shop_id: str, source_rel: str, photo_date: date,
+               submitted_by: str | None) -> Deal:
+    name = fields.get("name") if fields.get("name") in ("Meal Deal", "Premium Meal Deal") else "Meal Deal"
+    scheme = fields.get("loyalty_scheme") if fields.get("loyalty_scheme") in ("Clubcard", "Nectar", "other") else None
+    return Deal(
+        deal_id=str(uuid.uuid4())[:8],
+        shop_id=shop_id,
+        name=name,
+        price_gbp=float(fields["price_gbp"]),
+        loyalty_price_gbp=fields.get("loyalty_price_gbp"),
+        loyalty_scheme=scheme,
+        source_image=source_rel,
+        last_seen=photo_date,
+        submitted_by=submitted_by,
+        status="pending",
+    )
 
 
 def parse_preferences_from_text(free_text: str) -> dict:

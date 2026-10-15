@@ -22,6 +22,11 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 - The optimiser exposes `get_results(shops, items, deals, prefs) -> (primary, alternatives, other_shops)`.
 - Stale items (> 14 days) are excluded from ranking but shown greyed below all sections.
 
+## Photos
+- Uploads are filed by `photo_store.py` as `uploads/<shop_id>/<general|main|snack|drink>/<date>_<hash>.jpg`; `source_image` stores that relative path.
+- Shop comes from a dropdown, photo type from a radio; both are locked when answering a task (`tasks.photo_type`).
+- One photo can yield many products and deal signs (`extract.extract_photo`); the user edits them in a table, and everything is queued as pending.
+
 ## Map
 - A map view tab sits alongside the list view tab on Screen 1.
 - Uses `streamlit-folium` + `folium` with OpenStreetMap tiles. No API key needed.

@@ -12,7 +12,6 @@ Screens:
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import date, datetime
 from pathlib import Path
 
@@ -32,11 +31,14 @@ from db import (
     get_user_credit_balance,
     upsert_user,
 )
-from extract import extract_item, extract_deal, strip_exif
+from extract import build_deal, build_item, extract_photo
 from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
 from ingredients import assess as assess_ingredients
 from map_view import build_map
+from photo_store import (
+    PHOTO_TYPE_LABELS, PHOTO_TYPES, UPLOAD_EXTENSIONS, UPLOAD_ROOT, save_photo, set_storefront,
+)
 from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
@@ -48,7 +50,7 @@ from optimiser import (
     _row_to_deal,
 )
 
-UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR = UPLOAD_ROOT
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -644,11 +646,199 @@ def screen_detail():
 # Screen 3: Add a photo
 # ---------------------------------------------------------------------------
 
+def _photo_in_db(conn, rel_path: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM items WHERE source_image = ? UNION SELECT 1 FROM deals WHERE source_image = ?",
+        (rel_path, rel_path),
+    ).fetchone() is not None
+
+
+def _read_photos(conn, files, shop_id: str, photo_type: str) -> list[dict]:
+    """Save each photo into the shop/type folder and read it with Claude (button press only)."""
+    batch = []
+    progress = st.progress(0.0, text="Reading photos…")
+    for n, f in enumerate(files, start=1):
+        entry = {"file": f.name, "shop_id": shop_id, "photo_type": photo_type,
+                 "kind": "other", "notes": "", "items": [], "deals": [], "error": None,
+                 "duplicate": False}
+        try:
+            saved = save_photo(shop_id, photo_type, f.getvalue())
+            entry["path"], entry["rel_path"] = str(saved.path), saved.rel_path
+            if saved.already_existed and _photo_in_db(conn, saved.rel_path):
+                entry["duplicate"] = True
+            else:
+                result = extract_photo(saved.path, shop_id, photo_type)
+                entry.update(kind=result.kind, notes=result.notes,
+                             items=result.items, deals=result.deals)
+        except Exception as exc:
+            entry["error"] = str(exc)
+        batch.append(entry)
+        progress.progress(n / len(files), text=f"Read {n} of {len(files)} photos")
+    progress.empty()
+    return batch
+
+
+_ITEM_COLUMNS = ["include", "name", "category", "price_gbp", "meal_deal_eligible",
+                 "temperature", "kcal", "protein_g", "allergens", "confidence"]
+
+
+def _items_frame(items: list[dict]):
+    import pandas as pd
+    rows = [{
+        "include": i.get("price_gbp") is not None,
+        "name": i.get("name", ""),
+        "category": i.get("category") if i.get("category") in ("main", "snack", "drink") else "main",
+        "price_gbp": i.get("price_gbp"),
+        "meal_deal_eligible": i.get("meal_deal_eligible"),
+        "temperature": i.get("temperature") if i.get("temperature") in ("hot", "cold", "ambient") else "ambient",
+        "kcal": i.get("kcal"),
+        "protein_g": i.get("protein_g"),
+        "allergens": ", ".join(i.get("allergens") or []),
+        "confidence": i.get("confidence") or "medium",
+    } for i in items]
+    return pd.DataFrame(rows, columns=_ITEM_COLUMNS)
+
+
+def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
+    """Show each photo's findings as editable tables. Returns edited items/deals/banner choices."""
+    edited_items, edited_deals, banners = {}, {}, {}
+    for idx, entry in enumerate(batch):
+        with st.container(border=True):
+            img_col, info_col = st.columns([1, 4])
+            with img_col:
+                if entry.get("path") and Path(entry["path"]).exists():
+                    st.image(entry["path"], width=140)
+            with info_col:
+                where = f"{entry['shop_id']}/{entry['photo_type']}"
+                st.markdown(f"**{entry['file']}** · filed in `uploads/{where}/`")
+                if entry["error"]:
+                    st.error("We couldn't read this photo. Hold the phone steady so labels are sharp, then retake.")
+                    st.caption(f"_{entry['error']}_")
+                    continue
+                if entry["duplicate"]:
+                    st.info("Already uploaded and submitted — skipped.")
+                    continue
+                found = f"{len(entry['items'])} product(s)"
+                if entry["deals"]:
+                    found += f", {len(entry['deals'])} meal deal sign(s)"
+                st.caption(f"Photo type: {entry['kind']} · found {found}")
+                if entry["notes"]:
+                    st.caption(f"⚠️ {entry['notes']}")
+
+            if entry["items"]:
+                edited_items[idx] = st.data_editor(
+                    _items_frame(entry["items"]),
+                    key=f"batch_items_{nonce}_{idx}",
+                    hide_index=True,
+                    num_rows="fixed",
+                    use_container_width=True,
+                    disabled=["confidence"],
+                    column_config={
+                        "include": st.column_config.CheckboxColumn("Submit", width="small"),
+                        "name": st.column_config.TextColumn("Product", required=True),
+                        "category": st.column_config.SelectboxColumn("Type", options=["main", "snack", "drink"], required=True),
+                        "price_gbp": st.column_config.NumberColumn("Price", format="£%.2f", min_value=0.0, step=0.05),
+                        "meal_deal_eligible": st.column_config.CheckboxColumn("In deal"),
+                        "temperature": st.column_config.SelectboxColumn("Temp", options=["hot", "cold", "ambient"]),
+                        "kcal": st.column_config.NumberColumn("kcal", min_value=0),
+                        "protein_g": st.column_config.NumberColumn("Protein g", min_value=0.0),
+                        "allergens": st.column_config.TextColumn("Allergens (from label)"),
+                        "confidence": st.column_config.TextColumn("Read quality"),
+                    },
+                )
+            if entry["deals"]:
+                import pandas as pd
+                edited_deals[idx] = st.data_editor(
+                    pd.DataFrame([{
+                        "include": True,
+                        "name": d.get("name") or "Meal Deal",
+                        "price_gbp": d.get("price_gbp"),
+                        "loyalty_price_gbp": d.get("loyalty_price_gbp"),
+                        "loyalty_scheme": d.get("loyalty_scheme"),
+                    } for d in entry["deals"]]),
+                    key=f"batch_deals_{nonce}_{idx}",
+                    hide_index=True,
+                    num_rows="fixed",
+                    use_container_width=True,
+                    column_config={
+                        "include": st.column_config.CheckboxColumn("Submit", width="small"),
+                        "name": st.column_config.SelectboxColumn("Deal", options=["Meal Deal", "Premium Meal Deal"]),
+                        "price_gbp": st.column_config.NumberColumn("Price", format="£%.2f", min_value=0.0),
+                        "loyalty_price_gbp": st.column_config.NumberColumn("Card price", format="£%.2f", min_value=0.0),
+                        "loyalty_scheme": st.column_config.SelectboxColumn("Card", options=["Clubcard", "Nectar", "other"]),
+                    },
+                )
+            if entry["photo_type"] == "general" and entry["kind"] == "storefront":
+                banners[idx] = st.checkbox(
+                    "Use as this shop's banner photo", value=True, key=f"batch_banner_{nonce}_{idx}")
+    return edited_items, edited_deals, banners
+
+
+def _clean_number(value):
+    """data_editor gives NaN for empty cells."""
+    try:
+        return None if value is None or value != value else float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _submit_batch(conn, batch, edited_items, edited_deals, banners, user_id) -> tuple[list[str], list[str]]:
+    """Queue every ticked product/deal as pending. Returns (submitted item ids, problems)."""
+    submitted, deal_ids, problems = [], [], []
+    today = date.today()
+    for idx, frame in edited_items.items():
+        entry = batch[idx]
+        for row_no, row in enumerate(frame.to_dict("records")):
+            if not row["include"]:
+                continue
+            name = (row["name"] or "").strip()
+            price = _clean_number(row["price_gbp"])
+            if not name or price is None:
+                problems.append(f"{entry['file']}: '{name or 'unnamed'}' needs a name and price — skipped")
+                continue
+            fields = {
+                **entry["items"][row_no],          # keeps ingredients, diet flags, meats, label text
+                "name": name,
+                "category": row["category"],
+                "price_gbp": price,
+                "meal_deal_eligible": None if row["meal_deal_eligible"] is None else bool(row["meal_deal_eligible"]),
+                "temperature": row["temperature"],
+                "kcal": _clean_number(row["kcal"]),
+                "protein_g": _clean_number(row["protein_g"]),
+                "allergens": [a.strip() for a in (row["allergens"] or "").split(",") if a.strip()],
+            }
+            try:
+                item = build_item(fields, entry["shop_id"], entry["rel_path"], today, user_id)
+            except Exception as exc:
+                problems.append(f"{entry['file']}: '{name}' couldn't be saved ({exc})")
+                continue
+            data = item.model_dump()
+            data["last_seen"] = item.last_seen.isoformat()
+            submitted.append(approval.queue_item(conn, data))
+    for idx, frame in edited_deals.items():
+        entry = batch[idx]
+        for row in frame.to_dict("records"):
+            price = _clean_number(row["price_gbp"])
+            if not row["include"] or price is None:
+                continue
+            deal = build_deal({**row, "price_gbp": price,
+                               "loyalty_price_gbp": _clean_number(row["loyalty_price_gbp"])},
+                              entry["shop_id"], entry["rel_path"], today, user_id)
+            data = deal.model_dump()
+            data["last_seen"] = deal.last_seen.isoformat()
+            deal_ids.append(approval.queue_deal(conn, data))
+    for idx, use in banners.items():
+        if use:
+            set_storefront(batch[idx]["shop_id"], Path(batch[idx]["path"]))
+    return submitted + deal_ids, problems
+
+
 def screen_upload():
-    st.markdown("## Add a photo")
+    st.markdown("## Add photos")
     st.info(
-        "If your photo is clear, you get credits straight away. "
-        "If not, our team may take up to 24 hours to review it."
+        "Pick the shop and what's in the photo, then upload one or many photos. "
+        "One photo can cover a whole shelf — we'll pick out every product. "
+        "Credits are paid once our team approves each product."
     )
 
     user_id = _ensure_user()
@@ -657,7 +847,7 @@ def screen_upload():
 
     conn = _conn()
     shops_list = _load_data()[0]
-    shop_options = {s.name: s.shop_id for s in shops_list}
+    shop_ids = [s.shop_id for s in shops_list]
     shops_by_id = {s.shop_id: s.name for s in shops_list}
 
     # Active task from session state
@@ -667,104 +857,84 @@ def screen_upload():
         tasks_all = fetch_all_tasks(conn)
         active_task = next((t for t in tasks_all if t["task_id"] == active_task_id), None)
 
-    # ── Upload + results ────────────────────────────────────────────────────
-    col_upload, col_result = st.columns(2)
+    if flash := st.session_state.pop("upload_flash", None):
+        st.success(flash[0])
+        for problem in flash[1]:
+            st.warning(problem)
 
-    with col_upload:
-        if active_task:
-            st.markdown(
-                f'<div style="border:2px solid #0F7B5F;border-radius:8px;padding:12px;margin-bottom:12px">'
-                f'<b>Task: {active_task["item_name"]}</b> at {shops_by_id.get(active_task["shop_id"], active_task["shop_id"])}<br>'
-                f'<span style="color:#6B7280;font-size:13px">{active_task["ask"]}</span></div>',
-                unsafe_allow_html=True,
-            )
-            # Lock shop to the task's shop
-            shop_id = active_task["shop_id"]
-            shop_name = shops_by_id.get(shop_id, shop_id)
-            st.caption(f"Shop locked to: **{shop_name}**")
-            if st.button("Cancel task", key="cancel_task"):
-                st.session_state.pop("active_task_id", None)
-                st.rerun()
-            uploader_label = f"Upload photo for: {active_task['item_name']}"
-        else:
-            shop_name = st.selectbox("Which shop is this from?", list(shop_options.keys()))
-            shop_id = shop_options[shop_name]
-            uploader_label = "Photo the whole shelf"
-
-        uploaded = st.file_uploader(
-            uploader_label,
-            type=["jpg", "jpeg", "png", "webp"],
-            key="photo_upload",
-            help="Get labels, prices and deal signs in frame · JPG or PNG, up to 10 MB",
+    # ── Shop + photo type ───────────────────────────────────────────────────
+    if active_task:
+        st.markdown(
+            f'<div style="border:2px solid #0F7B5F;border-radius:8px;padding:12px;margin-bottom:12px">'
+            f'<b>Task: {active_task["item_name"]}</b> at {shops_by_id.get(active_task["shop_id"], active_task["shop_id"])}<br>'
+            f'<span style="color:#6B7280;font-size:13px">{active_task["ask"]}</span></div>',
+            unsafe_allow_html=True,
         )
+        shop_id = active_task["shop_id"]
+        photo_type = active_task["photo_type"] if active_task["photo_type"] in PHOTO_TYPES else "main"
+        st.caption(
+            f"Shop: **{shops_by_id.get(shop_id, shop_id)}** · "
+            f"Photo type: **{PHOTO_TYPE_LABELS[photo_type]}** (set by the task)"
+        )
+        if st.button("Cancel task", key="cancel_task"):
+            st.session_state.pop("active_task_id", None)
+            st.rerun()
+    else:
+        shop_col, type_col = st.columns(2)
+        with shop_col:
+            shop_id = st.selectbox(
+                "Which shop?", shop_ids,
+                format_func=lambda sid: shops_by_id[sid], key="upload_shop",
+            )
+        with type_col:
+            photo_type = st.radio(
+                "What's in the photo?", PHOTO_TYPES,
+                format_func=lambda t: PHOTO_TYPE_LABELS[t],
+                horizontal=True, key="upload_type",
+            )
 
-    with col_result:
-        st.markdown("**What we found**")
-        if uploaded is None:
-            st.caption("Upload a photo to see the items we pick out.")
-        else:
-            save_path = UPLOAD_DIR / f"{uuid.uuid4().hex[:8]}_{uploaded.name}"
-            save_path.write_bytes(uploaded.read())
+    nonce = st.session_state.get("upload_nonce", 0)
+    files = st.file_uploader(
+        f"Upload photos — they'll be filed under {shops_by_id.get(shop_id, shop_id)} › {PHOTO_TYPE_LABELS[photo_type]}",
+        type=UPLOAD_EXTENSIONS,
+        accept_multiple_files=True,
+        key=f"photo_upload_{nonce}",
+        help="Get labels, prices and deal signs in frame. iPhone HEIC photos are fine.",
+    )
+    if files and st.button(f"Read {len(files)} photo{'s' if len(files) != 1 else ''}", type="primary"):
+        st.session_state["upload_batch"] = _read_photos(conn, files, shop_id, photo_type)
 
-            with st.spinner("Reading your photo… you can keep browsing."):
-                try:
-                    item = extract_item(
-                        save_path,
-                        shop_id=shop_id,
-                        submitted_via="upload",
-                        submitted_by=user_id,
-                        strip_location=True,
-                    )
-                    extract_ok = True
-                except Exception as exc:
-                    extract_ok = False
-                    extract_err = str(exc)
-
-            if not extract_ok:
-                st.error(
-                    "We couldn't read this photo — it's too blurry. "
-                    "Hold the phone steady, step back so the labels are sharp, then retake."
+    batch = st.session_state.get("upload_batch")
+    if batch:
+        st.markdown("#### What we found")
+        st.caption("Check each product, fix anything wrong, untick anything that isn't right. "
+                   "⚠️ Allergen info is from the label only.")
+        edited_items, edited_deals, banners = _render_batch(batch, nonce)
+        n_ticked = sum(int(f["include"].sum()) for f in edited_items.values()) + \
+                   sum(int(f["include"].sum()) for f in edited_deals.values())
+        submit_label = f"Submit {n_ticked} for review"
+        if active_task:
+            submit_label += f" — complete task (+{active_task['bonus_credits']} bonus credits)"
+        sub_col, clear_col = st.columns([3, 1])
+        with sub_col:
+            if st.button(submit_label, type="primary", disabled=n_ticked == 0 and not banners, key="submit_batch"):
+                ids, problems = _submit_batch(conn, batch, edited_items, edited_deals, banners, user_id)
+                if active_task and user_id and ids:
+                    complete_task(conn, active_task["task_id"], user_id, ids[0])
+                    st.session_state.pop("active_task_id", None)
+                st.session_state["upload_flash"] = (
+                    f"Submitted {len(ids)} for review. They show as unverified until approved.",
+                    problems,
                 )
-                st.caption(f"_{extract_err}_")
-            else:
-                rows = [
-                    ("Item", item.name),
-                    ("Type", item.category),
-                    ("Price", f"£{item.price_gbp:.2f}"),
-                    ("Deal", "✅ eligible" if item.meal_deal_eligible else "Not in deal"),
-                    ("Allergens", ", ".join(item.allergens) if item.allergens else "none on label"),
-                    ("Meat", "not on label" if item.meats is None else (", ".join(item.meats) or "none")),
-                    ("Nutrition", _item_nutrition(item)),
-                ]
-                for label, val in rows:
-                    st.markdown(f"**{label}:** {val}")
-
-                if item.needs_review:
-                    st.warning(
-                        "Some details weren't clear enough — marked for team review. "
-                        "0 credits until approved (usually within 24 hours)."
-                    )
-                else:
-                    st.caption("⚠️ Allergen info is from the label only. Always check the packaging.")
-
-                submit_label = (
-                    f"Submit — complete task (+{active_task['bonus_credits']} bonus credits)"
-                    if active_task else "Looks right — submit"
-                )
-                if st.button(submit_label, type="primary"):
-                    item_id = approval.queue_item(conn, item.model_dump())
-                    st.session_state["last_submitted_id"] = item_id
-
-                    # Mark task complete in DB — this is what makes the tick persist
-                    if active_task and user_id:
-                        complete_task(conn, active_task["task_id"], user_id, item_id)
-                        st.session_state.pop("active_task_id", None)
-
-                    if item.needs_review:
-                        st.info("Sent to our team to check. 0 credits until approved — usually within 24 hours.")
-                    else:
-                        st.success("Published. Credits will be added once approved. It's live in results now.")
-                    st.rerun()
+                st.session_state.pop("upload_batch", None)
+                st.session_state["upload_nonce"] = nonce + 1
+                _load_data.clear()
+                st.rerun()
+        with clear_col:
+            if st.button("Discard", key="discard_batch"):
+                st.session_state.pop("upload_batch", None)
+                st.session_state["upload_nonce"] = nonce + 1
+                st.rerun()
 
     # ── Task cards ──────────────────────────────────────────────────────────
     st.divider()

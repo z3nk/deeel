@@ -49,8 +49,9 @@ def _data_uri(path: Path) -> str:
 
 
 def storefront_path(shop: Shop) -> Path | None:
-    """Storefront photo for this branch, if one has been added."""
-    return _find(SHOP_PHOTO_DIR, shop.shop_id)
+    """Storefront photo for this branch: a hand-added asset, else one set from an upload."""
+    from photo_store import storefront_upload
+    return _find(SHOP_PHOTO_DIR, shop.shop_id) or storefront_upload(shop.shop_id)
 
 
 def logo_html(shop: Shop, size: int = 28) -> str:

@@ -4,7 +4,7 @@ A lunch optimiser for UCL Bloomsbury students. Set your preferences, and Deeelic
 
 ## How it works
 
-1. **Capture** — Upload a shelf-label photo. Claude Vision extracts the item name, price, diet flags and allergens into structured data.
+1. **Capture** — Pick the shop and photo type (main / snack / drink / general), upload one or many photos. Claude Vision reads every product in each photo (a whole shelf works) plus any meal deal sign; you check and edit them in a table before submitting for approval.
 2. **Search** — The optimiser filters by your diet, allergens, budget, walking distance and freshness, then scores every possible lunch with a weighted formula.
 3. **Results** — One featured recommendation, up to 3 alternatives at the same shop, and the best option from 3 other nearby shops.
 
@@ -80,6 +80,7 @@ deeel.py          Deeel score (0–100)
 ingredients.py    Ingredient quality: processing markers + ingredient count
 demo.py           Live tour behind the ? button
 shop_images.py    Shop logos / storefront photos
+photo_store.py    uploads/<shop_id>/<general|main|snack|drink>/ photo filing
 map_view.py       Folium map helper
 ledger.py         Credit ledger and earning rules
 approval.py       Pending/approved/rejected flow
@@ -94,4 +95,4 @@ tests/            pytest suite
 - Diet flags and allergens come **only** from printed label text — never inferred.
 - Items with unknown allergen data are excluded when allergen filters are active.
 - Duplicate photos are rejected by image hash.
-- EXIF location data is stripped from every upload.
+- Photos are filed as `uploads/<shop_id>/<general|main|snack|drink>/`, rotated upright, shrunk, and re-saved without EXIF, so location data is never stored. Re-uploading the same photo is detected.
