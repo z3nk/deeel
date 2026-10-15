@@ -114,3 +114,24 @@
 .dl-compare__na { font-size: 16px; line-height: 22px; font-weight: 700; color: var(--text-muted); }
 .dl-compare__note { font-size: 12px; line-height: 16px; margin-top: var(--space-1); }
 .dl-compare__note--win { color: var(--success-ink); font-weight: 600; }
+
+/* ── Streamlit bindings: filter chips ─────────────────────────────────────
+   st.pills renders plain buttons with no selected-state hook, so the off state
+   lives here (scoped by widget key) and app.py emits the "on" rule per run for
+   the selected positions (_chip_state_css). Same look as .dl-chip. */
+.st-key-allergens_avoid button, .st-key-allergens_avoid_quick button,
+.st-key-diets button, .st-key-meats_allowed button {
+  font-family: var(--font-ui); font-weight: 600; min-height: 32px;
+  padding: 6px var(--space-3); border-radius: var(--radius-chip);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  background: var(--surface); color: var(--text);
+}
+.st-key-allergens_avoid button p, .st-key-allergens_avoid_quick button p,
+.st-key-diets button p, .st-key-meats_allowed button p { font-size: 13px; line-height: 16px; font-weight: 600; }
+.st-key-allergens_avoid button:hover, .st-key-allergens_avoid_quick button:hover { border-color: var(--allergen-ink); color: var(--allergen-ink); }
+.st-key-diets button:hover, .st-key-meats_allowed button:hover { border-color: var(--primary); color: var(--primary); }
+.st-key-allergens_avoid button:focus-visible, .st-key-allergens_avoid_quick button:focus-visible,
+.st-key-diets button:focus-visible, .st-key-meats_allowed button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+/* Filter bar on the Find screen */
+.st-key-dl_filter_bar { margin-bottom: var(--space-2); }
+.st-key-dl_allergy_pills .dl-box, .st-key-dl_allergy_pills_quick .dl-box { margin-top: var(--space-2); font-size: 12px; line-height: 16px; }
