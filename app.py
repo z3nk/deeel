@@ -1165,6 +1165,18 @@ def screen_review():
     if flash := st.session_state.pop("review_flash", None):
         st.success(flash)
 
+    with st.expander("Publish approved data to the live site"):
+        st.caption("Writes every approved real product and meal deal to `seed/approved.json`. "
+                   "Commit and push that file; the deployed app loads it on startup.")
+        if st.button("Export approved data", key="export_snapshot"):
+            if is_admin():
+                from snapshot import export_snapshot
+                counts = export_snapshot(conn)
+                st.session_state["review_flash"] = (
+                    f"Exported {counts['items']} product(s) and {counts['deals']} deal(s) to "
+                    "seed/approved.json — now commit and push it.")
+                st.rerun()
+
     with st.expander("Fill missing nutrition by barcode"):
         st.caption("For products with a barcode but no kcal / protein / ingredients: first our own "
                    "label data for the same barcode, then Open Food Facts. Allergens are never filled.")

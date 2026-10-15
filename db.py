@@ -327,20 +327,33 @@ def _migrate(conn: sqlite3.Connection) -> None:
     for col, col_type in missing.items():
         conn.execute(f"ALTER TABLE items ADD COLUMN {col} {col_type}")
     conn.execute(f"PRAGMA user_version = {FALLBACK_DATA_VERSION}")
-    conn.execute("DELETE FROM items WHERE source_image = 'fallback.jpg'")
-    conn.execute("DELETE FROM deals WHERE source_image = 'fallback.jpg'")
+    # _auto_seed_items reloads placeholders when this marker is missing
+    conn.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    conn.execute("DELETE FROM meta WHERE key = 'fallback_version'")
     conn.commit()
 
 
 def _auto_seed_items(conn: sqlite3.Connection) -> None:
     """
-    On first startup (no approved items in DB), load fallback seed data automatically.
-    This lets the app work out-of-the-box on Streamlit Community Cloud without a manual seed step.
+    1. Placeholder (fallback) data, loaded once per FALLBACK_DATA_VERSION, so every
+       shop shows something on Streamlit Cloud without a manual seed step.
+    2. The approved-data snapshot (seed/approved.json), if present — see snapshot.py.
+    3. Placeholders removed for shops that now have approved real data.
     """
-    row = conn.execute("SELECT 1 FROM items WHERE status = 'approved' LIMIT 1").fetchone()
-    if row is not None:
-        return  # already seeded
+    from snapshot import meta_get, meta_set, prune_placeholders, sync_snapshot
 
+    if meta_get(conn, "fallback_version") != str(FALLBACK_DATA_VERSION):
+        conn.execute("DELETE FROM items WHERE source_image = 'fallback.jpg'")
+        conn.execute("DELETE FROM deals WHERE source_image = 'fallback.jpg'")
+        conn.commit()
+        _load_fallback(conn)
+        meta_set(conn, "fallback_version", str(FALLBACK_DATA_VERSION))
+
+    sync_snapshot(conn)
+    prune_placeholders(conn)
+
+
+def _load_fallback(conn: sqlite3.Connection) -> None:
     # Load in-process on this connection. Running load_seed.py as a subprocess
     # recursed forever: its own get_connection() saw an empty DB and spawned again.
     import importlib.util

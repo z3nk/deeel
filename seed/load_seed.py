@@ -11,6 +11,8 @@ Usage:
     python seed/load_seed.py --fallback # force fallback data regardless of photos
     python seed/load_seed.py --reset    # wipe items/deals tables first, then load
     python seed/load_seed.py --strip-gps  # remove GPS from inbox JPEGs before committing them
+    python seed/load_seed.py --export   # write approved real data to seed/approved.json (commit it;
+                                        # the deployed app loads it on startup — see snapshot.py)
     python seed/load_seed.py --inbox    # import seed/inbox/<shop_id>/<general|main|snack|drink>/
                                         # photos as PENDING for the Review queue (see importer.py)
 """
@@ -362,6 +364,8 @@ if __name__ == "__main__":
     parser.add_argument("--reset", action="store_true", help="Wipe items/deals tables before loading")
     parser.add_argument("--inbox", action="store_true",
                         help="Import photos from seed/inbox/<shop_id>/<type>/ as pending for review")
+    parser.add_argument("--export", action="store_true",
+                        help="Write approved real items/deals to seed/approved.json for the deployed app")
     parser.add_argument("--strip-gps", action="store_true",
                         help="Remove GPS from JPEGs in seed/inbox/ (lossless) before committing them")
     args = parser.parse_args()
@@ -375,6 +379,13 @@ if __name__ == "__main__":
         sys.exit(0)
 
     conn = get_connection()
+
+    if args.export:
+        from snapshot import SNAPSHOT_PATH, export_snapshot
+        counts = export_snapshot(conn)
+        print(f"Exported {counts['items']} approved product(s) and {counts['deals']} deal(s) to {SNAPSHOT_PATH}.")
+        print("Commit and push it; every app instance loads it on startup.")
+        sys.exit(0)
 
     if args.inbox:
         from importer import DEFAULT_INBOX, ensure_inbox, import_inbox
