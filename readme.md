@@ -1,122 +1,98 @@
-# Deeelicious
+# Deeelicious 🥪🥤
 
-A lunch optimiser for UCL Bloomsbury students. Set your preferences, and Deeelicious finds the best main + snack + drink combo across nearby shops — comparing meal deals against buying separately.
+A lunch optimiser built for **UCL Bloomsbury** students. Set your budget, diet, and walking limit, and Deeelicious finds the best main + snack + drink combination across nearby shops — automatically comparing meal deal bundle prices against buying items separately.
 
-The app is live at [https://deeelicious.streamlit.app/](https://deeelicious.streamlit.app/).
+👉 **Try the live app:** [https://deeelicious.streamlit.app/](https://deeelicious.streamlit.app/)
 
-## How it works
+---
 
-1. **Capture** — Pick the shop and photo type (main / snack / drink / general), upload one or many photos. Claude Vision reads every product in each photo (a whole shelf works) plus any meal deal sign; you check and edit them in a table before submitting for approval.
-2. **Search** — The optimiser filters by your diet, allergens, budget, walking distance and freshness, then scores every possible lunch with a weighted formula.
-3. **Results** — One featured recommendation, up to 3 alternatives at the same shop, and the best option from 3 other nearby shops.
+## What It Does
 
-## Features
+Grabbing lunch around campus shouldn't be a gamble of walking around hungry, guessing which meal deal saves you money, or worrying about allergens.
 
-- **Sidebar preferences** — Max price, walking limit, hot/cold/any, diet chips (vegetarian, vegan, halal, kosher), meat-in-main chips, whole-meal protein / calorie limits, allergen exclusions, loyalty cards (Clubcard / Nectar), sort by Deeel score / quality / distance / price.
-- **Deeel score** — Every combination gets a 0–100 rating; see below.
-- **Live tour** — The **?** button in the top-right walks through the app on live data.
-- **Deal vs. separate pricing** — Automatically compares the meal deal bundle price against buying items individually.
-- **Map view** — OpenStreetMap with colour-coded shop markers and a walking-radius circle.
-- **Credits & rewards** — Earn credits for approved photo submissions; redeem them for sponsor vouchers.
-- **Freshness tracking** — Every price carries a `last_seen` date and links back to the source photo. Items older than 14 days are excluded from ranking.
+Deeelicious scans real shelf prices and nutrition data from shops near UCL to give you:
+- **The Best Deal First** — One top-rated lunch combination tailored to your exact diet and budget.
+- **Shop Alternatives** — Want a different main or drink? See the best swaps at the same shop without leaving.
+- **Nearby Shop Comparisons** — See what other supermarkets just a few minutes away offer for the same price.
+- **Deal vs. Separate Pricing** — Automatic maths showing exactly how much you save with a meal deal versus purchasing items individually.
+- **Interactive Map** — Visualise walking distances from UCL campus with colour-coded shop pins and walking radius boundaries.
 
-## The Deeel score
+---
 
-A 0–100 rating for each main + snack + drink, built only from label data:
+## Supported Shops (Near UCL Bloomsbury)
 
-| Factor | Points | How it's scored |
-|---|---|---|
-| Value | 30 | Meal price on a fixed scale: £3 = full marks, £8 = zero |
-| Fillingness | 25 | Total protein (30 g = full) and calories (650 kcal = full) |
-| Ingredient quality | 25 | How processed the items are — see below. The main counts double |
-| Nutrition balance | 10 | Share of calories from protein (25% = full) |
-| Deal saving | 10 | % saved by the meal deal vs buying separately (35% = full) |
+All within easy walking distance of the main UCL campus:
+- **Tesco Express** · Tottenham Court Road
+- **Sainsbury's Local** · Warren Street (21 Hampstead Road)
+- **M&S Food** · Tottenham Court Road
+- **Lidl** · Tottenham Court Road
+- **Waitrose** · Brunswick Centre
+- **Pret A Manger** · Tottenham Court Road
 
-### Ingredient quality
+---
 
-Read from the printed ingredients list (`ingredients.py`), based on the NOVA idea that ultra-processed food is marked by industrial additives and ingredients you wouldn't cook with:
+## How It Works
 
-- **Processing markers, counted by type** — colours, preservatives, emulsifiers & thickeners, flavour enhancers, sweeteners, modified starch, flavourings, glucose syrups / refined sugars, hydrogenated fats. Each type present costs 12 points (max 60), whether it's written as an E-number or by name. Counting types, not additives, stops one long label dominating and catches labels that never use E-numbers.
-- **Benign additives are ignored** — antioxidants and acids (E300–E399, e.g. vitamin C, citric acid) and E500s (raising agents, acidity regulators).
-- **Ingredient count, top level only** — the first 6 are free, then 3 points each (max 30). Sub-ingredients in brackets don't count, so "Bread (flour, water, yeast)" is one ingredient.
-- **No ingredients on the label scores 40** — below a typical label, so leaving the ingredients out of a photo doesn't pay. (A very processed label can still score lower, down to 10.)
-- Premium-range branding and student ratings are **not** used here: they measure marketing and taste, not ingredients.
+1. **Set Your Preferences**
+   - **Budget & Distance**: Slide your maximum spend and walking time (e.g. within an 8-minute walk).
+   - **Dietary Choices**: Pick dietary chips including **Vegetarian**, **Vegan**, **Halal**, and **Kosher**.
+   - **Allergen Protection**: Exclude items containing gluten, dairy, nuts, soy, egg, and other major allergens.
+   - **Nutrition Targets**: Set minimum protein thresholds and maximum calorie caps for the whole meal.
+   - **Preferences**: Choose hot, cold, or any food; toggle Clubcard and Nectar loyalty card pricing.
+   - **Sorting**: Rank by **Deeel score**, overall quality, walking distance, or lowest price.
 
-Each card's **How it's scored** button shows the breakdown and the reason for every item, e.g. "5 ingredients · preservatives, emulsifiers & thickeners".
+2. **Explore Your Recommendations**
+   - **Top Pick (Section A)**: The single best main, snack, and drink combination for your preferences.
+   - **Same-Shop Swaps (Section B)**: Alternative combinations at that shop if you fancy something else.
+   - **Other Shops (Section C)**: The best options from other nearby shops.
 
-## Importing a batch of photos (seed walk)
+3. **Earn Credits & Help Other Students**
+   - Snap photos of supermarket shelves and meal deal labels on your phone.
+   - Upload them to keep prices and stock up-to-date.
+   - Earn credits when your photo is approved, redeemable for rewards and vouchers.
 
-Instead of the upload screen, drop photos into folders and run one command:
+4. **Interactive Tour**
+   - Click the **?** button in the top right of the app anytime for an interactive tour through all features with live data.
 
-```
-seed/inbox/<shop_id>/<general|main|snack|drink>/IMG_1234.jpg
-python seed/load_seed.py --inbox
-```
+---
 
-Shop IDs: `tesco-tcr`, `sainsburys-warren-st`, `ms-tcr`, `lidl-tcr`, `waitrose-brunswick`, `pret-tcr` (the first run creates the empty folders). Each photo goes through the same pipeline as the app (upright, shrunk, location removed, HEIC ok, duplicates skipped), is read by Claude (4 at a time), and lands in the Review queue as **pending** — nothing is auto-approved. The date used is when the photo was taken. Originals are moved to `seed/inbox_done/`; failed photos stay in the inbox for a re-run. Products with no readable price are listed at the end instead of being queued.
+## The Deeel Score (0–100)
 
-## Publishing to the live site
+Every lunch combo receives an objective **Deeel score** out of 100 based entirely on verified printed label data:
 
-Review locally, then `python seed/load_seed.py --export` (or **Export approved data** in the Review queue) writes approved real products and deals to `seed/approved.json`. Commit and push it — the deployed app loads it on startup. Shops with approved real data drop their placeholder data; others keep it.
+| Factor | Weight | Scoring Criteria |
+|---|:---:|---|
+| **Value** | **30 pts** | Price scaled from £3.00 (maximum points) to £8.00 (zero points) |
+| **Fillingness** | **25 pts** | Whole-meal protein (30 g for full marks) and energy (650 kcal for full marks) |
+| **Ingredient Quality** | **25 pts** | Based on NOVA food processing principles — whole ingredients score higher than ultra-processed additives (mains weighted 2×) |
+| **Nutrition Balance** | **10 pts** | Proportion of total meal calories derived from protein (25% for full marks) |
+| **Deal Saving** | **10 pts** | Percentage saved by buying as a meal deal compared to buying items separately (35% saving for full marks) |
 
-## Supported shops
+### Ingredient Quality Breakdown
+- **Processing Markers**: Penalises industrial additives typical of ultra-processed food (artificial colours, chemical preservatives, emulsifiers/thickeners, flavour enhancers, artificial sweeteners, modified starches, flavourings, glucose syrups, and hydrogenated fats).
+- **Safe Additives Ignored**: Harmless antioxidants, vitamin C, citric acid, and natural leavening agents are not penalised.
+- **Short Ingredients Lists**: Whole-food recipes with fewer ingredients score higher.
+- Tap the **"How it's scored"** button on any recommendation card to see a transparent breakdown of points and ingredient notes.
 
-Tesco · Sainsbury's · Waitrose · M&S · Lidl · Pret — all within walking distance of UCL's main campus.
+---
 
-## Tech stack
+## Food Safety & Trust
 
-| Component | Tech |
-|-----------|------|
-| UI | Streamlit |
-| Storage | SQLite |
-| Data validation | Pydantic |
-| Vision extraction | Anthropic SDK (Claude) |
-| Map | Folium + streamlit-folium |
+- **Strict Label-Only Data**: Diet flags and allergen warnings are taken strictly from printed packaging labels — never guessed or assumed by AI.
+- **Safety First**: If allergen information for an item is missing or unverified, that item is automatically excluded when that allergen filter is enabled.
+- **Freshness Window**: Prices and items carry a `last_seen` timestamp. Any product older than 14 days is automatically retired from active rankings.
+- **Privacy Protected**: Uploaded photos are stripped of all EXIF and GPS location metadata before being processed.
 
-## Quick start
+---
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## Developer & Technical Information
 
-# Add your Anthropic API key
-cp .env.example .env
-# Edit .env with your key, and set ADMIN_PASSCODE to unlock the Review queue
+Looking to run the app locally, run tests, or contribute to development?
 
-# Run the app
-streamlit run app.py
-```
-
-## Project structure
-
-```
-app.py            Streamlit UI
-extract.py        Photo → structured item/deal JSON
-optimiser.py      Filters, scoring, per-shop search
-deeel.py          Deeel score (0–100)
-ingredients.py    Ingredient quality: processing markers + ingredient count
-demo.py           Live tour behind the ? button
-admin.py          Team passcode gate for the Review queue
-shop_images.py    Shop logos / storefront photos
-photo_store.py    uploads/<shop_id>/<general|main|snack|drink>/ photo filing
-importer.py       seed/inbox/ drag-and-drop batch import (python seed/load_seed.py --inbox)
-nutrition_fill.py Fill missing nutrition by barcode: our data, then Open Food Facts
-snapshot.py       Export approved data to seed/approved.json; sync it on startup
-openfoodfacts.py  Open Food Facts API client (barcode lookup, per-pack values)
-map_view.py       Folium map helper
-ledger.py         Credit ledger and earning rules
-approval.py       Pending/approved/rejected flow
-models.py         Pydantic schema (frozen)
-db.py             SQLite schema and seed data
-seed/             Seed-walk photos
-tests/            pytest suite
-```
-
-## Data integrity
-
-- Diet flags and allergens come **only** from printed label text — never inferred.
-- Missing kcal / protein / ingredients are filled by **barcode** only (check digit validated): first from our own photos of the same barcode, then from [Open Food Facts](https://world.openfoodfacts.org) (ODbL). Label values always win, per-pack figures are only used when the pack size is known, and the app shows where each filled value came from. Allergens and diet flags are never filled this way.
-- Items with unknown allergen data are excluded when allergen filters are active.
-- The Review queue is team-only: unlock it under **Team** in the sidebar with the shared `ADMIN_PASSCODE` (from `.env` locally or Streamlit secrets when deployed). With no passcode set it stays locked. Approve one product, a whole photo, or every clear read at once.
-- Re-uploading the same photo is detected by content hash.
-- Photos are filed as `uploads/<shop_id>/<general|main|snack|drink>/`, rotated upright, shrunk, and re-saved without EXIF, so location data is never stored. Re-uploading the same photo is detected.
+See the [Developer Guide (dev.md)](dev.md) for:
+- Local setup and environment configuration
+- Tech stack overview (Streamlit, SQLite, Claude Vision, Folium)
+- Publishing data to live site (`seed/approved.json`)
+- Batch photo import pipeline (`seed/inbox/`)
+- Test suite execution (`pytest`)
+- Project architecture and data schemas
