@@ -104,6 +104,12 @@ CRITICAL RULES — read carefully:
    otherwise null. Never estimate.
 3c. barcode: the digits under the product's barcode (on the pack or shelf label), only
    if every digit is clearly readable. Otherwise null. Never guess digits.
+3d. price_gbp is the product's OWN price when bought on its own. Shelf labels often
+   also show a meal deal flash such as "Meal Deal Main £3.85", "Meal deal £3.95",
+   "Any 3 for £5" or "Main + snack + drink £3.85". That is the BUNDLE price, never the
+   item price: do not put it in price_gbp. If a label only shows a bundle price, set
+   price_gbp to null. A meal deal flash does mean meal_deal_eligible = true.
+   loyalty_price_gbp is the item's own Clubcard / Nectar price, not a bundle price.
 4. confidence: set to "high" if the label is fully readable, "medium" if partially
    readable, "low" if the label is too blurry, occluded, or absent.
 5. needs_review: set to true if confidence is not "high", or if any field is ambiguous.
@@ -334,6 +340,8 @@ _PHOTO_SYSTEM = _ITEM_SYSTEM + """
 8. Match each price to its product using the shelf-edge label directly below or
    beside it. If you can't tell which price belongs to a product, set price_gbp to
    null rather than guessing.
+9. Any meal deal / bundle price you see (sign or shelf-label flash) goes in "deals",
+   once per distinct price — not in any product's price_gbp (see rule 3d).
 """
 
 _PHOTO_PROMPT = """
@@ -392,6 +400,36 @@ class PhotoExtraction:
     deals: list[dict]
 
 
+_BUNDLE_WORDS = re.compile(r"meal\s*deal|any\s+\d+\s+for|\bbundle\b|main\s*\+\s*snack", re.IGNORECASE)
+
+
+def drop_bundle_prices(item: dict, deals: list[dict]) -> dict:
+    """
+    Safety net for rule 3d: if a product's price equals a meal deal price seen in the
+    same photo and its label text mentions a meal deal, it's the bundle price, not the
+    item's own price. Clear it (the product is then not queued without a price) and
+    keep meal_deal_eligible.
+    """
+    price = item.get("price_gbp")
+    if price is None:
+        return item
+    bundle_prices = set()
+    for d in deals:
+        for key in ("price_gbp", "loyalty_price_gbp"):
+            try:
+                bundle_prices.add(round(float(d[key]), 2))
+            except (KeyError, TypeError, ValueError):
+                pass
+    try:
+        price = round(float(price), 2)
+    except (TypeError, ValueError):
+        return item
+    if price in bundle_prices and _BUNDLE_WORDS.search(item.get("source_text") or ""):
+        return {**item, "price_gbp": None, "meal_deal_eligible": True,
+                "confidence": "low" if item.get("confidence") == "low" else "medium"}
+    return item
+
+
 def extract_photo(image_path: Path, shop_id: str, photo_type: str) -> PhotoExtraction:
     """
     Read every product (and any meal deal sign) in one photo.
@@ -430,6 +468,8 @@ def extract_photo(image_path: Path, shop_id: str, photo_type: str) -> PhotoExtra
             )
             raw = _extract_json(response.content[0].text)
             items = [i for i in raw.get("items") or [] if isinstance(i, dict) and i.get("name")]
+            deals = [d for d in raw.get("deals") or [] if isinstance(d, dict) and d.get("price_gbp")]
+            items = [drop_bundle_prices(i, deals) for i in items]
             if photo_type in ("main", "snack", "drink"):
                 for i in items:
                     i["category"] = photo_type
@@ -437,7 +477,7 @@ def extract_photo(image_path: Path, shop_id: str, photo_type: str) -> PhotoExtra
                 kind=raw.get("kind") or "other",
                 notes=raw.get("notes") or "",
                 items=items,
-                deals=[d for d in raw.get("deals") or [] if isinstance(d, dict) and d.get("price_gbp")],
+                deals=deals,
             )
         except (json.JSONDecodeError, ValueError) as exc:
             if attempt == 1:

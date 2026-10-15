@@ -143,3 +143,49 @@ def test_strip_gps_in_place_is_lossless(tmp_path):
     assert hashlib.sha256(img.tobytes()).hexdigest() == pixels            # no re-encode
     assert piexif.load(str(path))["Exif"][piexif.ExifIFD.DateTimeOriginal] == b"2026:10:15 14:09:38"
     assert photo_store.strip_gps_in_place(path) is False                   # nothing left to strip
+
+
+# ---------------------------------------------------------------------------
+# Meal deal (bundle) prices must not become item prices
+# ---------------------------------------------------------------------------
+
+from extract import drop_bundle_prices
+
+TESCO_DEAL = [{"name": "Meal Deal", "price_gbp": 4.25, "loyalty_price_gbp": 3.85}]
+
+
+def test_bundle_price_on_shelf_label_is_cleared():
+    item = {"name": "Chicken Club", "price_gbp": 3.85, "source_text": "Meal Deal Main £3.85 Clubcard Price",
+            "confidence": "high"}
+    out = drop_bundle_prices(item, TESCO_DEAL)
+    assert out["price_gbp"] is None and out["meal_deal_eligible"] is True and out["confidence"] == "medium"
+
+
+def test_real_price_kept_even_if_label_mentions_meal_deal():
+    item = {"name": "Chicken Club", "price_gbp": 3.50, "source_text": "£3.50 · Meal Deal Main", "confidence": "high"}
+    assert drop_bundle_prices(item, TESCO_DEAL)["price_gbp"] == 3.50
+
+
+def test_coincidental_same_price_without_deal_wording_kept():
+    item = {"name": "Big Salad", "price_gbp": 4.25, "source_text": "£4.25", "confidence": "high"}
+    assert drop_bundle_prices(item, TESCO_DEAL)["price_gbp"] == 4.25
+
+
+def test_no_deals_in_photo_leaves_items_alone():
+    item = {"name": "Wrap", "price_gbp": 3.95, "source_text": "Meal deal £3.95"}
+    assert drop_bundle_prices(item, [])["price_gbp"] == 3.95
+
+
+@patch("extract._get_client")
+def test_extract_photo_applies_bundle_rule_and_prompt_says_so(mock_get):
+    payload = {"kind": "shelf", "notes": "", "deals": [{"name": "Meal Deal", "price_gbp": 3.95}],
+               "items": [{"name": "Tuna Mayo", "category": "main", "price_gbp": 3.95,
+                          "source_text": "Meal deal £3.95", "confidence": "high"},
+                         {"name": "Egg Mayo", "category": "main", "price_gbp": 2.10,
+                          "source_text": "£2.10 Meal deal", "confidence": "high"}]}
+    mock_get.return_value = _mock_client(payload)
+    saved = photo_store.save_photo("sainsburys-warren-st", "main", _jpeg())
+    result = extract_photo(saved.path, "sainsburys-warren-st", "main")
+    assert [i["price_gbp"] for i in result.items] == [None, 2.10]
+    system = mock_get.return_value.messages.create.call_args.kwargs["system"]
+    assert "BUNDLE price, never the\n   item price" in system
