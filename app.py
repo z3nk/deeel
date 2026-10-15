@@ -12,6 +12,7 @@ Screens:
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -66,7 +67,7 @@ st.set_page_config(
     page_title="Deeelicious",
     page_icon="🥪",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",   # expanded on desktop, collapsed on phones
 )
 inject_theme()   # design system: fonts, :root tokens, .dl-* classes (design/tokens.json)
 
@@ -133,11 +134,58 @@ MEATS     = ["Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
 
 
+# Filter widget keys. Allergy chips also appear in the Find screen's filter bar
+# (one tap away on phones); that copy has its own key and is kept in sync.
+ALLERGY_KEY = "allergens_avoid"
+ALLERGY_QUICK_KEY = "allergens_avoid_quick"
+DIET_KEY = "diets"
+
+
+def _allergy_box_html() -> str:
+    """The full allergy warning as the design system's .dl-box--allergy (never dismissable)."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", ALLERGY_WARNING)
+    return f'<div class="dl-box dl-box--allergy" role="note">{text}</div>'
+
+
+_CHIP_ON = {
+    "allergy": "background: var(--allergen); border-color: var(--allergen); color: var(--on-primary);",
+    "diet": "background: var(--primary); border-color: var(--primary); color: var(--on-primary);",
+}
+# On-state wording: allergy "No Gluten ✕", diet "Vegan ✓". Added in CSS because pill
+# labels must stay fixed: Streamlit derives the widget id from them, so changing a
+# label would reset the selection.
+_CHIP_BEFORE = {"allergy": '"No "', "diet": None}
+_CHIP_AFTER = {"allergy": '" ✕"', "diet": '" ✓"'}
+
+
+def _chip_state_css(key: str, options: list[str], variant: str) -> str:
+    """
+    <style> colouring the selected chips of one st.pills group. Streamlit gives
+    selected pills no attribute to hook, so target them by position; the off
+    state is in design/components.css. Token variables only.
+    """
+    selected = set(st.session_state.get(key) or [])
+    rules = []
+    for i, option in enumerate(options, start=1):
+        if option not in selected:
+            continue
+        button = f".st-key-{key} button:nth-child({i})"
+        rules.append(f"{button}, {button}:hover {{ {_CHIP_ON[variant]} }}")
+        if _CHIP_BEFORE[variant]:
+            rules.append(f"{button} p::before {{ content: {_CHIP_BEFORE[variant]}; }}")
+        rules.append(f"{button} p::after {{ content: {_CHIP_AFTER[variant]}; }}")
+    return f"<style>{' '.join(rules)}</style>" if rules else ""
+
+
+def _copy_quick_allergies() -> None:
+    """on_change for the filter-bar allergy chips: mirror them into the sidebar's."""
+    st.session_state[ALLERGY_KEY] = list(st.session_state.get(ALLERGY_QUICK_KEY) or [])
+
+
 def _apply_pending_resets() -> None:
     """Clear filter widgets requested by result-page buttons, before the widgets render."""
     if st.session_state.pop("_clear_diet_pending", False):
-        for d in DIETS:
-            st.session_state[f"diet_{d}"] = False
+        st.session_state[DIET_KEY] = []
         st.session_state["meats_allowed"] = []
     if st.session_state.pop("_clear_nutrition_pending", False):
         st.session_state["min_protein"] = 0
@@ -156,30 +204,43 @@ def render_sidebar() -> Preferences:
     )
     st.sidebar.divider()
 
-    # Allergens — safety first, red label
-    st.sidebar.markdown(
-        '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
-        unsafe_allow_html=True,
-    )
-    avoid = [a for a in ALLERGENS if st.sidebar.checkbox(a, key=f"avoid_{a}")]
-    if avoid:
-        st.sidebar.caption("Items without allergen info from a printed label are hidden.")
-    st.sidebar.caption(ALLERGY_WARNING)
+    # Allergens — first control, serious mode (AllergyChip + AllergyWarning)
+    with st.sidebar.container(key="dl_allergy_pills"):
+        st.markdown(
+            '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
+            unsafe_allow_html=True,
+        )
+        avoid = st.pills(
+            "Allergies — avoid", ALLERGENS, selection_mode="multi", key=ALLERGY_KEY,
+            label_visibility="collapsed",
+        ) or []
+        if avoid:
+            st.caption("Items without allergen info from a printed label are hidden.")
+        st.markdown(_allergy_box_html(), unsafe_allow_html=True)
     st.sidebar.divider()
 
-    # Diet
-    st.sidebar.markdown("**Diet**")
-    diet_flags = [d for d in DIETS if st.sidebar.checkbox(d, key=f"diet_{d}")]
-    certified = [d.lower() for d in diet_flags if d in ("Halal", "Kosher")]
-    if certified:
-        st.sidebar.caption(f"Only mains with a printed {' / '.join(certified)} label are shown.")
-    meats = st.sidebar.pills(
-        "Meat in main",
-        MEATS,
-        selection_mode="multi",
-        key="meats_allowed",
-        help="Only show mains whose label lists these meats. None picked = any.",
-    ) or []
+    # Diet + meat — DietChip style
+    with st.sidebar.container(key="dl_diet_pills"):
+        st.markdown('<p class="dl-chip-heading">Diet</p>', unsafe_allow_html=True)
+        diet_flags = st.pills(
+            "Diet", DIETS, selection_mode="multi", key=DIET_KEY,
+            label_visibility="collapsed",
+        ) or []
+        certified = [d.lower() for d in diet_flags if d in ("Halal", "Kosher")]
+        if certified:
+            st.caption(f"Only mains with a printed {' / '.join(certified)} label are shown.")
+        meats = st.pills(
+            "Meat in main",
+            MEATS,
+            selection_mode="multi",
+            key="meats_allowed",
+            help="Only show mains whose label lists these meats. None picked = any.",
+        ) or []
+        chip_css = (_chip_state_css(ALLERGY_KEY, ALLERGENS, "allergy")
+                    + _chip_state_css(DIET_KEY, DIETS, "diet")
+                    + _chip_state_css("meats_allowed", MEATS, "diet"))
+        if chip_css:
+            st.html(chip_css)
     st.sidebar.divider()
 
     # Nutrition — whole meal totals
@@ -231,6 +292,45 @@ def render_sidebar() -> Preferences:
         has_clubcard=loyalty,
         has_nectar=loyalty,
     )
+
+
+def render_filter_bar(prefs: Preferences) -> None:
+    """
+    Compact filter bar at the top of the Find screen. On phones the sidebar starts
+    collapsed, so this keeps the allergy chips one tap away and says what's active.
+    """
+    active = []
+    if prefs.allergens_exclude:
+        active.append("avoiding " + ", ".join(prefs.allergens_exclude))
+    active += [d.title() for d in prefs.diet_flags]
+    if prefs.meats_allowed:
+        active.append(" / ".join(m.title() for m in prefs.meats_allowed))
+    if prefs.max_price_gbp:
+        active.append(f"≤ £{prefs.max_price_gbp:.2f}")
+    active.append(f"{prefs.max_walking_minutes:.0f} min walk")
+
+    with st.container(key="dl_filter_bar"):
+        summary_col, button_col = st.columns([3, 1], vertical_alignment="center")
+        with summary_col:
+            st.caption("Filters: " + " · ".join(active))
+        with button_col:
+            with st.popover("Allergies", use_container_width=True):
+                with st.container(key="dl_allergy_pills_quick"):
+                    st.markdown(
+                        '<p class="dl-chip-heading dl-chip-heading--allergy">Allergies — avoid</p>',
+                        unsafe_allow_html=True,
+                    )
+                    # Mirror the sidebar's chips before rendering (never after)
+                    st.session_state[ALLERGY_QUICK_KEY] = list(st.session_state.get(ALLERGY_KEY) or [])
+                    st.pills(
+                        "Allergies — avoid", ALLERGENS, selection_mode="multi", key=ALLERGY_QUICK_KEY,
+                        label_visibility="collapsed",
+                        on_change=_copy_quick_allergies,
+                    )
+                    if quick_css := _chip_state_css(ALLERGY_QUICK_KEY, ALLERGENS, "allergy"):
+                        st.html(quick_css)
+                    st.markdown(_allergy_box_html(), unsafe_allow_html=True)
+                st.caption("More filters (diet, budget, walk, sort): tap › at the top left.")
 
 
 # ---------------------------------------------------------------------------
@@ -1344,6 +1444,7 @@ def main():
     screen = st.session_state["screen"]
 
     if screen == "find":
+        render_filter_bar(prefs)
         screen_find(prefs)
     elif screen == "detail":
         screen_detail()
