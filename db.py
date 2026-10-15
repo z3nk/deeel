@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS items (
     diet_flags          TEXT NOT NULL DEFAULT '[]',   -- JSON array
     allergens           TEXT NOT NULL DEFAULT '[]',   -- JSON array
     ingredients_text    TEXT,
+    meats               TEXT,           -- JSON array or NULL (unknown)
+    kcal                REAL,           -- per pack, NULL = not on label
+    protein_g           REAL,           -- per pack, NULL = not on label
     premium_range       INTEGER,        -- 1/0/NULL
     quality_rating      REAL,
     source_image        TEXT NOT NULL,
@@ -272,11 +275,32 @@ def get_connection() -> sqlite3.Connection:
 
 def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     _seed_shops(conn)
     _seed_rewards(conn)
     _seed_tasks(conn)
     conn.commit()
     _auto_seed_items(conn)
+
+
+_ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL"}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """
+    Add columns introduced after a DB was first created.
+    If any were missing, drop fallback seed rows so _auto_seed_items reloads them
+    with the new fields filled in. Real (photo/upload) records are kept.
+    """
+    existing = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
+    missing = {c: t for c, t in _ITEM_COLUMNS_ADDED.items() if c not in existing}
+    if not missing:
+        return
+    for col, col_type in missing.items():
+        conn.execute(f"ALTER TABLE items ADD COLUMN {col} {col_type}")
+    conn.execute("DELETE FROM items WHERE source_image = 'fallback.jpg'")
+    conn.execute("DELETE FROM deals WHERE source_image = 'fallback.jpg'")
+    conn.commit()
 
 
 def _auto_seed_items(conn: sqlite3.Connection) -> None:
@@ -288,16 +312,16 @@ def _auto_seed_items(conn: sqlite3.Connection) -> None:
     if row is not None:
         return  # already seeded
 
-    import subprocess
-    import sys
-    from pathlib import Path
+    # Load in-process on this connection. Running load_seed.py as a subprocess
+    # recursed forever: its own get_connection() saw an empty DB and spawned again.
+    import importlib.util
 
     seed_script = Path(__file__).parent / "seed" / "load_seed.py"
     if seed_script.exists():
-        subprocess.run(
-            [sys.executable, str(seed_script), "--fallback"],
-            check=False,
-        )
+        spec = importlib.util.spec_from_file_location("load_seed", seed_script)
+        load_seed = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(load_seed)
+        load_seed.load_fallback(conn)
 
 
 def _seed_shops(conn: sqlite3.Connection) -> None:

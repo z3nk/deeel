@@ -182,6 +182,28 @@ FALLBACK_ITEMS = [
      "last_seen": TODAY, "submitted_via": "seed", "confidence": "high"},
 ]
 
+# Meat + per-pack nutrition for fallback items: item_id → (meats, kcal, protein_g).
+# Placeholder values — the seed walk replaces them with label readings.
+FALLBACK_NUTRITION = {
+    "t-main-1": (["chicken"], 480, 28),  "t-main-2": (["pork"], 410, 22),
+    "t-main-3": ([], 450, 14),           "t-snack-1": ([], 130, 2),
+    "t-snack-2": ([], 70, 1),            "t-drink-1": ([], 210, 0),
+    "t-drink-2": ([], 0, 0),
+    "s-main-1": ([], 440, 13),           "s-main-2": (["chicken"], 500, 30),
+    "s-snack-1": ([], 70, 1),            "s-drink-1": ([], 160, 1),
+    "p-main-1": ([], 220, 6),            "p-main-2": ([], 520, 21),
+    "p-snack-1": ([], 105, 1),           "p-drink-1": ([], 5, 0),
+    "l-main-1": (["chicken"], 360, 24),  "l-snack-1": ([], 150, 3),
+    "l-drink-1": ([], 0, 0),
+    "m-main-1": (["chicken"], 470, 32),  "m-main-2": (["duck"], 430, 20),
+    "m-snack-1": (None, 160, 1),         "m-drink-1": ([], 0, 0),
+    "w-main-1": ([], 390, 17),           "w-main-2": (["fish"], 420, 25),
+    "w-snack-1": ([], 300, 9),           "w-drink-1": ([], 0, 0),
+}
+
+# Placeholder halal label so the Halal chip has something to show before the walk
+FALLBACK_EXTRA_FLAGS = {"m-main-1": ["halal"]}
+
 FALLBACK_DEALS = [
     {"deal_id": "deal-tesco", "shop_id": "tesco-tcr", "name": "Meal Deal",
      "price_gbp": 4.25, "loyalty_price_gbp": 3.85, "loyalty_scheme": "Clubcard",
@@ -208,8 +230,13 @@ def load_fallback(conn, reset: bool = False) -> None:
 
     loaded_items = 0
     for item in FALLBACK_ITEMS:
+        meats, kcal, protein_g = FALLBACK_NUTRITION.get(item["item_id"], (None, None, None))
         item_id = queue_item(conn, {
             **item,
+            "diet_flags": item["diet_flags"] + FALLBACK_EXTRA_FLAGS.get(item["item_id"], []),
+            "meats": meats,
+            "kcal": kcal,
+            "protein_g": protein_g,
             "loyalty_price_gbp": item.get("loyalty_price_gbp"),
             "ingredients_text": None,
             "premium_range": None,

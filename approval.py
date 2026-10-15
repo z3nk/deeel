@@ -70,13 +70,15 @@ def queue_item(
         INSERT INTO items (
             item_id, shop_id, name, category, price_gbp, loyalty_price_gbp,
             meal_deal_eligible, temperature, diet_flags, allergens,
-            ingredients_text, premium_range, quality_rating, source_image,
+            ingredients_text, meats, kcal, protein_g,
+            premium_range, quality_rating, source_image,
             source_text, last_seen, submitted_via, submitted_by,
             status, confidence, needs_review
         ) VALUES (
             :item_id, :shop_id, :name, :category, :price_gbp, :loyalty_price_gbp,
             :meal_deal_eligible, :temperature, :diet_flags, :allergens,
-            :ingredients_text, :premium_range, :quality_rating, :source_image,
+            :ingredients_text, :meats, :kcal, :protein_g,
+            :premium_range, :quality_rating, :source_image,
             :source_text, :last_seen, :submitted_via, :submitted_by,
             'pending', :confidence, :needs_review
         )
@@ -86,6 +88,12 @@ def queue_item(
             "item_id": item_id,
             "diet_flags": json.dumps(item_data.get("diet_flags", [])),
             "allergens": json.dumps(item_data.get("allergens", [])),
+            "meats": (
+                None if item_data.get("meats") is None
+                else json.dumps(item_data["meats"])
+            ),
+            "kcal": item_data.get("kcal"),
+            "protein_g": item_data.get("protein_g"),
         },
     )
     conn.commit()

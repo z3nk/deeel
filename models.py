@@ -90,6 +90,11 @@ class Item(BaseModel):
     diet_flags: List[str] = Field(default_factory=list)   # only from label text
     allergens: List[str] = Field(default_factory=list)    # only from label text
     ingredients_text: Optional[str] = None
+    # Meat/fish named on the label (name or ingredients). [] = none; None = unknown
+    meats: Optional[List[str]] = None
+    # Per pack, from the printed nutrition panel. None = not on label / unreadable
+    kcal: Optional[float] = None
+    protein_g: Optional[float] = None
     premium_range: Optional[bool] = None
     quality_rating: Optional[float] = None      # 1–5, from student ratings only
     source_image: str
@@ -185,6 +190,11 @@ class Preferences(BaseModel):
     # Diet and allergen chips
     diet_flags: List[str] = Field(default_factory=list)
     allergens_exclude: List[str] = Field(default_factory=list)
+    # Meat multiselect: allowed meats for the main ("none" = meat-free). Empty = any
+    meats_allowed: List[str] = Field(default_factory=list)
+    # Nutrition, whole meal (main + snack + drink). None = no limit
+    min_protein_g: Optional[float] = None
+    max_kcal: Optional[float] = None
     # Loyalty card toggle
     has_clubcard: bool = False
     has_nectar: bool = False

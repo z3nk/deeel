@@ -86,6 +86,15 @@ CRITICAL RULES — read carefully:
 2. allergens: list ONLY allergens explicitly named on the label
    (e.g. "Contains: milk, wheat"). If unreadable or absent, return [].
 3. NEVER infer, guess, or assume diet or allergen status from the product name.
+   "Halal" goes in diet_flags only if a halal mark or the word "Halal" is printed.
+3a. meats: lowercase list from chicken, beef, pork, lamb, turkey, duck, fish
+   (ham/bacon/chorizo = pork; tuna/salmon/prawn = fish), taken from the product
+   name or printed ingredients. Return [] only if the label says vegetarian/vegan
+   or the full ingredients are readable and contain no meat or fish.
+   Otherwise return null.
+3b. kcal and protein_g: per whole pack, from the printed nutrition panel. If only
+   per-100g values are printed and the pack weight is printed, scale them;
+   otherwise null. Never estimate.
 4. confidence: set to "high" if the label is fully readable, "medium" if partially
    readable, "low" if the label is too blurry, occluded, or absent.
 5. needs_review: set to true if confidence is not "high", or if any field is ambiguous.
@@ -108,6 +117,9 @@ Return a JSON object with exactly these fields:
   "diet_flags": ["<only if explicitly printed>"],
   "allergens": ["<only if explicitly printed>"],
   "ingredients_text": "<full ingredients if printed, else null>",
+  "meats": ["<see rule 3a>"] or null,
+  "kcal": <number per pack or null>,
+  "protein_g": <number per pack or null>,
   "premium_range": <true | false | null>,
   "quality_rating": null,
   "source_image": "{filename}",

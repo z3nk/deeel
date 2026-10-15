@@ -12,7 +12,8 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 - Keep the app fast: load the DB once, cache results, call Claude only on button or upload.
 
 ## Preferences and controls
-- Preferences are set through sidebar controls only: allergen chips, diet chips, max price slider, walking limit slider, hot/cold/any toggle, loyalty card toggle, sort dropdown.
+- Preferences are set through sidebar controls only: allergen chips, diet chips (incl. Halal, label-only), meat-in-main multiselect (incl. "No meat"), whole-meal min protein / max calories sliders, max price slider, walking limit slider, hot/cold/any toggle, loyalty card toggle, sort dropdown.
+- Meat, kcal and protein come from the label like allergens. Unknown = excluded when that filter is on. Meat and diet filters apply to mains only; nutrition limits are whole-meal totals.
 - Free-text preference input ("cheap, warm, vegetarian") is a stretch feature. Do not build it until after the 1:30 hackathon gate.
 - The sort dropdown (Quality / Distance / Price) maps to score weights in the optimiser — see PLAN.md.
 

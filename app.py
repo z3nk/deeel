@@ -100,9 +100,23 @@ def _ensure_user():
 
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
 DIETS     = ["Vegetarian", "Vegan", "Halal"]
+MEATS     = ["No meat", "Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
+KCAL_CAP  = 1500   # slider max = no calorie limit
+
+
+def _apply_pending_resets() -> None:
+    """Clear filter widgets requested by result-page buttons, before the widgets render."""
+    if st.session_state.pop("_clear_diet_pending", False):
+        for d in DIETS:
+            st.session_state[f"diet_{d}"] = False
+        st.session_state["meats_allowed"] = []
+    if st.session_state.pop("_clear_nutrition_pending", False):
+        st.session_state["min_protein"] = 0
+        st.session_state["max_kcal"] = KCAL_CAP
 
 
 def render_sidebar() -> Preferences:
+    _apply_pending_resets()
     st.sidebar.title("🥪 Meal Deal Finder")
 
     # Username
@@ -126,6 +140,26 @@ def render_sidebar() -> Preferences:
     # Diet
     st.sidebar.markdown("**Diet**")
     diet_flags = [d for d in DIETS if st.sidebar.checkbox(d, key=f"diet_{d}")]
+    if "Halal" in diet_flags:
+        st.sidebar.caption("Only mains with a printed halal label are shown.")
+    meats = st.sidebar.multiselect(
+        "Meat in main",
+        MEATS,
+        key="meats_allowed",
+        placeholder="Any",
+        help="Only show mains whose label lists these meats. Pick 'No meat' for meat-free.",
+    )
+    st.sidebar.divider()
+
+    # Nutrition — whole meal totals
+    st.sidebar.markdown("**Nutrition (whole meal)**")
+    # Defaults via session_state (not value=) so the "Clear" button can reset them
+    st.session_state.setdefault("min_protein", 0)
+    st.session_state.setdefault("max_kcal", KCAL_CAP)
+    min_protein = st.sidebar.slider("Min protein", 0, 60, step=5, format="%d g", key="min_protein")
+    max_kcal = st.sidebar.slider("Max calories", 300, KCAL_CAP, step=50, format="%d kcal", key="max_kcal")
+    if min_protein or max_kcal < KCAL_CAP:
+        st.sidebar.caption("Items without a nutrition label are hidden.")
     st.sidebar.divider()
 
     # Preferences
@@ -160,6 +194,9 @@ def render_sidebar() -> Preferences:
         max_walking_minutes=float(walk_limit),
         diet_flags=[d.lower() for d in diet_flags],
         allergens_exclude=[a.lower() for a in avoid],
+        meats_allowed=["none" if m == "No meat" else m.lower() for m in meats],
+        min_protein_g=float(min_protein) if min_protein else None,
+        max_kcal=float(max_kcal) if max_kcal < KCAL_CAP else None,
         has_clubcard=loyalty,
         has_nectar=loyalty,
     )
@@ -192,6 +229,25 @@ def _allergen_line(items_list, avoid: list[str]) -> str:
     return f"Contains (from label): {allergen_str}"
 
 
+def _nutrition_line(items_list) -> str:
+    """'1,040 kcal · 31 g protein' for the meal, or '' if any value is missing."""
+    parts = []
+    if all(i.kcal is not None for i in items_list):
+        parts.append(f"{sum(i.kcal for i in items_list):,.0f} kcal")
+    if all(i.protein_g is not None for i in items_list):
+        parts.append(f"{sum(i.protein_g for i in items_list):.0f} g protein")
+    return " · ".join(parts)
+
+
+def _item_nutrition(item) -> str:
+    parts = []
+    if item.kcal is not None:
+        parts.append(f"{item.kcal:.0f} kcal")
+    if item.protein_g is not None:
+        parts.append(f"{item.protein_g:.0f} g protein")
+    return " · ".join(parts) or "nutrition not on label"
+
+
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False):
     from models import Lunch
 
@@ -209,6 +265,9 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 _allergen_line([lunch.main, lunch.snack, lunch.drink], prefs.allergens_exclude),
                 unsafe_allow_html=True,
             )
+            nutrition = _nutrition_line([lunch.main, lunch.snack, lunch.drink])
+            if nutrition:
+                st.caption(nutrition)
             if lunch.why:
                 st.caption(f"*{lunch.why}*")
 
@@ -264,11 +323,15 @@ def screen_find(prefs: Preferences):
                 if st.button("Relax to 15 min", key="relax_walk"):
                     st.session_state["walk_limit_override"] = 15
                     st.rerun()
-            elif not filtered:
-                st.warning("No items match your filters.")
+            elif not any(i.category == "main" for i in filtered):
+                st.warning("No mains match your filters.")
                 if st.button("Clear diet filters", key="relax_diet"):
-                    for d in DIETS:
-                        st.session_state[f"diet_{d}"] = False
+                    st.session_state["_clear_diet_pending"] = True
+                    st.rerun()
+            elif prefs.min_protein_g is not None or prefs.max_kcal is not None:
+                st.warning("No meal near you fits your protein / calorie limits.")
+                if st.button("Clear nutrition limits", key="relax_nutrition"):
+                    st.session_state["_clear_nutrition_pending"] = True
                     st.rerun()
             else:
                 st.info("Set your preferences on the left to find the best lunch near you.")
@@ -399,6 +462,7 @@ def screen_detail():
         st.caption(f"£{main.price_gbp:.2f}")
         allergens_str = ", ".join(main.allergens) if main.allergens else ("not checked" if main.allergens is None else "none listed")
         st.caption(f"Allergens: {allergens_str}")
+        st.caption(_item_nutrition(main))
         st.markdown(_freshness_badge(str(main.last_seen)), unsafe_allow_html=True)
         if main.status == "pending":
             st.caption("⚠️ Unverified")
@@ -415,6 +479,7 @@ def screen_detail():
         st.caption(f"£{snack.price_gbp:.2f}")
         allergens_str = ", ".join(snack.allergens) if snack.allergens else "none listed"
         st.caption(f"Allergens: {allergens_str}")
+        st.caption(_item_nutrition(snack))
         st.markdown(_freshness_badge(str(snack.last_seen)), unsafe_allow_html=True)
 
     with col3:
@@ -429,6 +494,7 @@ def screen_detail():
         st.caption(f"£{drink.price_gbp:.2f}")
         allergens_str = ", ".join(drink.allergens) if drink.allergens else "none listed"
         st.caption(f"Allergens: {allergens_str}")
+        st.caption(_item_nutrition(drink))
         st.markdown(_freshness_badge(str(drink.last_seen)), unsafe_allow_html=True)
 
     # Reset button
@@ -621,6 +687,8 @@ def screen_upload():
                     ("Price", f"£{item.price_gbp:.2f}"),
                     ("Deal", "✅ eligible" if item.meal_deal_eligible else "Not in deal"),
                     ("Allergens", ", ".join(item.allergens) if item.allergens else "none on label"),
+                    ("Meat", "not on label" if item.meats is None else (", ".join(item.meats) or "none")),
+                    ("Nutrition", _item_nutrition(item)),
                 ]
                 for label, val in rows:
                     st.markdown(f"**{label}:** {val}")

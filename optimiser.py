@@ -43,6 +43,7 @@ def _row_to_item(row: sqlite3.Row) -> Item:
     d = dict(row)
     d["diet_flags"] = json.loads(d["diet_flags"])
     d["allergens"] = json.loads(d["allergens"])
+    d["meats"] = None if d.get("meats") is None else json.loads(d["meats"])
     d["meal_deal_eligible"] = (
         None if d["meal_deal_eligible"] is None else bool(d["meal_deal_eligible"])
     )
@@ -80,15 +81,18 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
     2. Carries every required diet flag
     3. Contains none of the excluded allergens; null allergens = excluded if any allergen filter set
     4. last_seen within STALE_DAYS
-    5. (price cap applied at the lunch level, not item level)
+    5. Main's meats all in meats_allowed; unknown meats = excluded
+    6. kcal / protein known when a nutrition limit is set (totals checked per meal)
+    7. (price cap applied at the lunch level, not item level)
     """
     today = today or date.today()
     cutoff = today - timedelta(days=STALE_DAYS)
+    allowed_meats = {m.lower() for m in prefs.meats_allowed}
     results = []
 
     for item in items:
         # 1. Status
-        if prefs.allergens_exclude or prefs.diet_flags:
+        if prefs.allergens_exclude or prefs.diet_flags or allowed_meats:
             if item.status != "approved":
                 continue
         else:
@@ -126,9 +130,72 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
         if item_date < cutoff:
             continue
 
+        # 5. Meat — mains only, like diet flags. [] means meat-free ("none")
+        if allowed_meats and item.category == "main":
+            if item.meats is None:
+                continue
+            item_meats = {m.lower() for m in item.meats} or {"none"}
+            if not item_meats <= allowed_meats:
+                continue
+
+        # 6. Nutrition — every item in the meal needs a known value to total it
+        if prefs.max_kcal is not None and item.kcal is None:
+            continue
+        if prefs.min_protein_g is not None and item.protein_g is None:
+            continue
+
         results.append(item)
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Whole-meal nutrition constraints
+# ---------------------------------------------------------------------------
+
+def _has_nutrition_limit(prefs: Preferences) -> bool:
+    return prefs.max_kcal is not None or prefs.min_protein_g is not None
+
+
+def _meal_nutrition_ok(main: Item, snack: Item, drink: Item, prefs: Preferences) -> bool:
+    trio = (main, snack, drink)
+    if prefs.max_kcal is not None and sum(i.kcal for i in trio) > prefs.max_kcal:
+        return False
+    if prefs.min_protein_g is not None and sum(i.protein_g for i in trio) < prefs.min_protein_g:
+        return False
+    return True
+
+
+def _best_sides(main, snacks, drinks, prefs, key) -> Optional[tuple[Item, Item]]:
+    """Best (snack, drink) for a fixed main, honouring whole-meal nutrition limits."""
+    if not _has_nutrition_limit(prefs):
+        return max(snacks, key=key), max(drinks, key=key)
+    pairs = [
+        (s, d) for s in snacks for d in drinks
+        if _meal_nutrition_ok(main, s, d, prefs)
+    ]
+    if not pairs:
+        return None
+    return max(pairs, key=lambda p: key(p[0]) + key(p[1]))
+
+
+def _best_trio(mains, snacks, drinks, prefs, key) -> Optional[tuple[Item, Item, Item]]:
+    """
+    Highest-scoring main + snack + drink. Without nutrition limits the score is
+    additive, so each slot is picked independently; with limits, search per main
+    (shops hold a handful of items, so this stays cheap).
+    """
+    if not _has_nutrition_limit(prefs):
+        return max(mains, key=key), max(snacks, key=key), max(drinks, key=key)
+    best, best_score = None, float("-inf")
+    for m in mains:
+        sides = _best_sides(m, snacks, drinks, prefs, key)
+        if sides is None:
+            continue
+        score = key(m) + key(sides[0]) + key(sides[1])
+        if score > best_score:
+            best, best_score = (m, *sides), score
+    return best
 
 
 # ---------------------------------------------------------------------------
@@ -223,9 +290,11 @@ def best_lunch_for_shop(
         h = 1.0 if item.temperature == "hot" and item.category == "main" else 0.0
         return w_q * q + w_h * h
 
-    best_main  = max(mains,  key=lambda i: _item_score(i, prefs))
-    best_snack = max(snacks, key=lambda i: _item_score(i, prefs))
-    best_drink = max(drinks, key=lambda i: _item_score(i, prefs))
+    key = lambda i: _item_score(i, prefs)
+    trio = _best_trio(mains, snacks, drinks, prefs, key)
+    if trio is None:
+        return None
+    best_main, best_snack, best_drink = trio
 
     sep_price = (
         _effective_price(best_main, prefs)
@@ -259,11 +328,13 @@ def best_lunch_for_shop(
         deal_snacks = [i for i in snacks if i.meal_deal_eligible]
         deal_drinks = [i for i in drinks if i.meal_deal_eligible]
 
-        if deal_mains and deal_snacks and deal_drinks and deal_price <= p_max:
-            dm = max(deal_mains,  key=lambda i: _item_score(i, prefs))
-            ds = max(deal_snacks, key=lambda i: _item_score(i, prefs))
-            dd = max(deal_drinks, key=lambda i: _item_score(i, prefs))
-
+        deal_trio = (
+            _best_trio(deal_mains, deal_snacks, deal_drinks, prefs, key)
+            if deal_mains and deal_snacks and deal_drinks and deal_price <= p_max
+            else None
+        )
+        if deal_trio is not None:
+            dm, ds, dd = deal_trio
             deal_score = score_lunch(dm, ds, dd, deal_price, prefs)
 
             if best is None or deal_score > best.score:
@@ -345,15 +416,18 @@ def top_lunches_for_shop(
         w_p, w_q, w_h = _weights_from_sort(prefs)
         return w_q * _quality_score(item) + (w_h if item.temperature == "hot" and item.category == "main" else 0)
 
-    # Best snack and drink stay fixed
-    best_snack = max(snacks, key=_item_score)
-    best_drink = max(drinks, key=_item_score)
-
-    # Rank all mains and produce one Lunch per main
+    # Rank all mains and produce one Lunch per main, each with its best sides
+    # (the same snack + drink unless nutrition limits force a different pair)
     ranked_mains = sorted(mains, key=_item_score, reverse=True)
     results: list[Lunch] = []
 
-    for main in ranked_mains[:n]:
+    for main in ranked_mains:
+        if len(results) == n:
+            break
+        sides = _best_sides(main, snacks, drinks, prefs, _item_score)
+        if sides is None:
+            continue
+        best_snack, best_drink = sides
         sep_price = (
             _effective_price(main, prefs)
             + _effective_price(best_snack, prefs)
@@ -409,7 +483,9 @@ def get_results(
     primary = ranked[0]
 
     # Section B: alternatives at primary shop (skip the primary main)
-    all_at_primary = top_lunches_for_shop(primary.shop, items, deals, prefs, n=4)
+    # Must use filtered items, or alternatives would ignore allergen/diet/meat filters
+    filtered_items = hard_filter(items, prefs, today)
+    all_at_primary = top_lunches_for_shop(primary.shop, filtered_items, deals, prefs, n=4)
     alternatives = [l for l in all_at_primary if l.main.item_id != primary.main.item_id][:3]
 
     # Section C: best from next 3 shops

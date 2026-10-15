@@ -8,7 +8,7 @@ from datetime import date
 import pytest
 
 from models import Deal, Item, Preferences, Shop
-from optimiser import best_lunch_for_shop, hard_filter, rank_shops, score_lunch
+from optimiser import best_lunch_for_shop, get_results, hard_filter, rank_shops, score_lunch
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +45,9 @@ def _item(
     last_seen: str = FRESH,
     status: str = "approved",
     quality_rating: float | None = None,
+    meats: list[str] | None = None,
+    kcal: float | None = None,
+    protein_g: float | None = None,
 ) -> Item:
     return Item(
         item_id=item_id,
@@ -62,6 +65,9 @@ def _item(
         submitted_via="seed",
         status=status,
         quality_rating=quality_rating,
+        meats=meats,
+        kcal=kcal,
+        protein_g=protein_g,
     )
 
 
@@ -212,3 +218,91 @@ class TestRankShops:
         lunch = best_lunch_for_shop(SHOP_A, ITEMS_A, [expensive_deal], prefs)
         assert lunch is not None
         assert lunch.used_deal is False
+
+
+# ---------------------------------------------------------------------------
+# Meat + nutrition filters
+# ---------------------------------------------------------------------------
+
+class TestMeatFilter:
+    CHICKEN = _item("chk", "shop-a", "main", 2.00, meats=["chicken"])
+    HAM     = _item("ham", "shop-a", "main", 2.00, meats=["pork"])
+    VEG     = _item("veg", "shop-a", "main", 2.00, meats=[])
+    UNKNOWN = _item("unk", "shop-a", "main", 2.00, meats=None)
+
+    def _ids(self, allowed):
+        items = [self.CHICKEN, self.HAM, self.VEG, self.UNKNOWN]
+        return [i.item_id for i in hard_filter(items, Preferences(meats_allowed=allowed), today=TODAY)]
+
+    def test_no_filter_keeps_all(self):
+        assert self._ids([]) == ["chk", "ham", "veg", "unk"]
+
+    def test_chicken_only(self):
+        assert self._ids(["chicken"]) == ["chk"]
+
+    def test_no_meat(self):
+        assert self._ids(["none"]) == ["veg"]
+
+    def test_chicken_or_no_meat(self):
+        assert self._ids(["chicken", "none"]) == ["chk", "veg"]
+
+    def test_unknown_meat_excluded(self):
+        assert "unk" not in self._ids(["pork", "chicken", "none"])
+
+    def test_snacks_unaffected(self):
+        snack = _item("s", "shop-a", "snack", 1.00, meats=None)
+        assert hard_filter([snack], Preferences(meats_allowed=["none"]), today=TODAY) == [snack]
+
+
+class TestNutrition:
+    ITEMS = [
+        _item("big",   "shop-a", "main",  2.00, quality_rating=5, kcal=700, protein_g=40),
+        _item("light", "shop-a", "main",  2.00, quality_rating=3, kcal=300, protein_g=20),
+        _item("crisp", "shop-a", "snack", 1.00, quality_rating=5, kcal=200, protein_g=2),
+        _item("fruit", "shop-a", "snack", 1.00, quality_rating=3, kcal=60,  protein_g=1),
+        _item("coke",  "shop-a", "drink", 1.00, quality_rating=5, kcal=200, protein_g=0),
+        _item("water", "shop-a", "drink", 1.00, quality_rating=3, kcal=0,   protein_g=0),
+    ]
+
+    def test_unknown_nutrition_excluded_when_limit_set(self):
+        item = _item("x", "shop-a", "drink", 1.00)
+        assert hard_filter([item], Preferences(max_kcal=800), today=TODAY) == []
+        assert hard_filter([item], Preferences(), today=TODAY) == [item]
+
+    def test_no_limit_picks_highest_quality(self):
+        lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences())
+        assert (lunch.main.item_id, lunch.snack.item_id, lunch.drink.item_id) == ("big", "crisp", "coke")
+
+    def test_kcal_cap_is_whole_meal(self):
+        """
+        Under 800 kcal: big main only fits with fruit + water (score 2.0); the light
+        main fits with crisps + coke (score 2.5), so the search picks that trio.
+        """
+        lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences(max_kcal=800))
+        assert (lunch.main.item_id, lunch.snack.item_id, lunch.drink.item_id) == ("light", "crisp", "coke")
+        assert lunch.main.kcal + lunch.snack.kcal + lunch.drink.kcal <= 800
+
+    def test_min_protein(self):
+        lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences(min_protein_g=35))
+        assert lunch.main.item_id == "big"
+        assert best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences(min_protein_g=50)) is None
+
+    def test_alternatives_respect_limits(self):
+        shop_items = self.ITEMS
+        _, alts, _ = get_results([SHOP_A], shop_items, [], Preferences(max_kcal=500), today=TODAY)
+        for l in alts:
+            assert l.main.kcal + l.snack.kcal + l.drink.kcal <= 500
+
+
+class TestAlternativesFiltered:
+    def test_alternatives_respect_allergens(self):
+        """Section B must not offer a main the user is allergic to."""
+        items = [
+            _item("safe",  "shop-a", "main",  2.00, allergens=["milk"]),
+            _item("nutty", "shop-a", "main",  2.00, allergens=["nuts"]),
+            _item("s",     "shop-a", "snack", 1.00, allergens=["milk"]),
+            _item("d",     "shop-a", "drink", 1.00, allergens=["milk"]),
+        ]
+        primary, alts, _ = get_results([SHOP_A], items, [], Preferences(allergens_exclude=["nuts"]), today=TODAY)
+        assert primary.main.item_id == "safe"
+        assert all(l.main.item_id != "nutty" for l in alts)
