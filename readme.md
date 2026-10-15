@@ -42,6 +42,17 @@ Read from the printed ingredients list (`ingredients.py`), based on the NOVA ide
 
 Each card's **How it's scored** button shows the breakdown and the reason for every item, e.g. "5 ingredients · preservatives, emulsifiers & thickeners".
 
+## Importing a batch of photos (seed walk)
+
+Instead of the upload screen, drop photos into folders and run one command:
+
+```
+seed/inbox/<shop_id>/<general|main|snack|drink>/IMG_1234.jpg
+python seed/load_seed.py --inbox
+```
+
+Shop IDs: `tesco-tcr`, `sainsburys-tcr`, `ms-tcr`, `lidl-tcr`, `waitrose-brunswick`, `pret-tcr` (the first run creates the empty folders). Each photo goes through the same pipeline as the app (upright, shrunk, location removed, HEIC ok, duplicates skipped), is read by Claude (4 at a time), and lands in the Review queue as **pending** — nothing is auto-approved. The date used is when the photo was taken. Originals are moved to `seed/inbox_done/`; failed photos stay in the inbox for a re-run. Products with no readable price are listed at the end instead of being queued.
+
 ## Supported shops
 
 Tesco · Sainsbury's · Waitrose · M&S · Lidl · Pret — all within walking distance of UCL's main campus.
@@ -82,6 +93,7 @@ demo.py           Live tour behind the ? button
 admin.py          Team passcode gate for the Review queue
 shop_images.py    Shop logos / storefront photos
 photo_store.py    uploads/<shop_id>/<general|main|snack|drink>/ photo filing
+importer.py       seed/inbox/ drag-and-drop batch import (python seed/load_seed.py --inbox)
 map_view.py       Folium map helper
 ledger.py         Credit ledger and earning rules
 approval.py       Pending/approved/rejected flow

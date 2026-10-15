@@ -10,6 +10,8 @@ Usage:
     python seed/load_seed.py            # auto-detects photos; falls back if none found
     python seed/load_seed.py --fallback # force fallback data regardless of photos
     python seed/load_seed.py --reset    # wipe items/deals tables first, then load
+    python seed/load_seed.py --inbox    # import seed/inbox/<shop_id>/<general|main|snack|drink>/
+                                        # photos as PENDING for the Review queue (see importer.py)
 """
 
 from __future__ import annotations
@@ -357,9 +359,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Load seed data into the database.")
     parser.add_argument("--fallback", action="store_true", help="Force fallback data (no photos)")
     parser.add_argument("--reset", action="store_true", help="Wipe items/deals tables before loading")
+    parser.add_argument("--inbox", action="store_true",
+                        help="Import photos from seed/inbox/<shop_id>/<type>/ as pending for review")
     args = parser.parse_args()
 
     conn = get_connection()
+
+    if args.inbox:
+        from importer import DEFAULT_INBOX, ensure_inbox, import_inbox
+        ensure_inbox(DEFAULT_INBOX, [r["shop_id"] for r in conn.execute("SELECT shop_id FROM shops")])
+        print(import_inbox(conn).summary())
+        sys.exit(0)
 
     if args.fallback:
         load_fallback(conn, reset=args.reset)
