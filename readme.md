@@ -2,6 +2,8 @@
 
 A lunch optimiser for UCL Bloomsbury students. Set your preferences, and Deeelicious finds the best main + snack + drink combo across nearby shops — comparing meal deals against buying separately.
 
+The app is live at [https://deeelicious.streamlit.app/](https://deeelicious.streamlit.app/).
+
 ## How it works
 
 1. **Capture** — Pick the shop and photo type (main / snack / drink / general), upload one or many photos. Claude Vision reads every product in each photo (a whole shelf works) plus any meal deal sign; you check and edit them in a table before submitting for approval.
