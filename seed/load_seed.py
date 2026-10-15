@@ -13,6 +13,8 @@ Usage:
     python seed/load_seed.py --strip-gps  # remove GPS from inbox JPEGs before committing them
     python seed/load_seed.py --export   # write approved real data to seed/approved.json (commit it;
                                         # the deployed app loads it on startup — see snapshot.py)
+    python seed/load_seed.py --fill-off # fill missing allergens/nutrition/ingredients from Open Food
+                                        # Facts for every product (rate-limited; resumable)
     python seed/load_seed.py --inbox    # import seed/inbox/<shop_id>/<general|main|snack|drink>/
                                         # photos as PENDING for the Review queue (see importer.py)
 """
@@ -364,6 +366,8 @@ if __name__ == "__main__":
     parser.add_argument("--reset", action="store_true", help="Wipe items/deals tables before loading")
     parser.add_argument("--inbox", action="store_true",
                         help="Import photos from seed/inbox/<shop_id>/<type>/ as pending for review")
+    parser.add_argument("--fill-off", action="store_true",
+                        help="Fill missing allergens/nutrition/ingredients from Open Food Facts (slow, resumable)")
     parser.add_argument("--export", action="store_true",
                         help="Write approved real items/deals to seed/approved.json for the deployed app")
     parser.add_argument("--strip-gps", action="store_true",
@@ -379,6 +383,12 @@ if __name__ == "__main__":
         sys.exit(0)
 
     conn = get_connection()
+
+    if args.fill_off:
+        from nutrition_fill import fill_existing
+        checked, filled = fill_existing(conn, log=lambda m: print(m, flush=True))
+        print(f"Checked {checked} product(s), filled {filled} field(s).")
+        sys.exit(0)
 
     if args.export:
         from snapshot import SNAPSHOT_PATH, export_snapshot

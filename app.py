@@ -748,7 +748,9 @@ def _read_photos(conn, files, shop_id: str, photo_type: str) -> list[dict]:
             else:
                 result = extract_photo(saved.path, shop_id, photo_type)
                 entry.update(kind=result.kind, notes=result.notes,
-                             items=[fill_missing(conn, i) for i in result.items],
+                             # barcode lookups only: name searches are rate-limited (~6s each),
+                             # so they run later via the Review queue / --fill-off
+                             items=[fill_missing(conn, i, use_name_search=False) for i in result.items],
                              deals=result.deals)
         except Exception as exc:
             entry["error"] = str(exc)
@@ -1226,14 +1228,17 @@ def screen_review():
                     "seed/approved.json — now commit and push it.")
                 st.rerun()
 
-    with st.expander("Fill missing nutrition by barcode"):
-        st.caption("For products with a barcode but no kcal / protein / ingredients: first our own "
-                   "label data for the same barcode, then Open Food Facts. Also fills missing allergens — "
-                   "Open Food Facts allergens are shown with a warning and never clear an item for an allergy filter.")
-        if st.button("Fill missing now", key="fill_missing"):
+    with st.expander("Fill missing allergens / nutrition / ingredients"):
+        st.caption("For every product missing kcal, protein, ingredients or allergens: our own label data "
+                   "for the same barcode, then Open Food Facts by barcode, then by product name (strict match; "
+                   "the matched product is shown as the source). Open Food Facts allergens are shown with a "
+                   "warning and never clear an item for an allergy filter. Name searches are rate-limited, so "
+                   "this does 10 products per click — for everything at once run "
+                   "`python seed/load_seed.py --fill-off`.")
+        if st.button("Fill next 10 products", key="fill_missing"):
             if is_admin():
-                with st.spinner("Looking up barcodes…"):
-                    checked, filled = fill_existing(conn)
+                with st.spinner("Looking up products (about 6 seconds each)…"):
+                    checked, filled = fill_existing(conn, limit=10)
                 _load_data.clear()
                 st.session_state["review_flash"] = f"Checked {checked} product(s), filled {filled} field(s)."
                 st.rerun()

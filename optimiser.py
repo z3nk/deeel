@@ -114,7 +114,7 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
         # Allergens from Open Food Facts (crowd-sourced) can mark an item unsafe
         # below, but never make it pass: only printed-label allergens count as known.
         if prefs.allergens_exclude:
-            from_label = item.external_fields.get("allergens") != OFF_SOURCE
+            from_label = not (item.external_fields.get("allergens") or "").startswith(OFF_SOURCE)
             if not item.allergens:  # allergens unknown → exclude
                 continue
             item_allergens_lower = [a.lower() for a in item.allergens]

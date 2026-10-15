@@ -97,11 +97,61 @@ def test_open_food_facts_values_not_reused_as_our_data(conn):
     assert out.get("kcal") is None
 
 
-def test_no_barcode_or_bad_barcode_does_nothing(conn):
-    with patch("openfoodfacts._fetch") as off:
-        assert fill_missing(conn, {"name": "Wrap"}) == {"name": "Wrap"}
-        fill_missing(conn, {"name": "Wrap", "barcode": "5449000000997"})
-    assert not off.called
+def test_bad_barcode_never_looked_up_and_one_word_names_not_searched(conn):
+    with patch("openfoodfacts._fetch") as off, patch("openfoodfacts._search") as search:
+        out = fill_missing(conn, {"name": "Wrap", "barcode": "5449000000997"})
+    assert not off.called and not search.called          # bad check digit; "Wrap" too vague
+    assert out.get("kcal") is None and out["external_fields"] == {}
+
+
+# --- name search (no barcode) -------------------------------------------------
+
+LIPTON = [
+    {"code": "1", "brands": "Lipton", "product_name": "Peach Ice Tea", "quantity": "330 ml",
+     "nutriments": {"energy-kcal_100g": 19, "proteins_100g": 0}, "ingredients_text": "Water, sugar, peach"},
+    {"code": "2", "brands": "Lipton", "product_name": "Peach Ice Tea", "quantity": "500 ml",
+     "nutriments": {"energy-kcal_100g": 19, "proteins_100g": 0}, "ingredients_text": "Water, sugar, peach",
+     "allergens_tags": []},
+    {"code": "3", "brands": "Volvic", "product_name": "Touch of Fruit Strawberry", "quantity": "500 ml"},
+]
+
+
+def test_name_match_prefers_same_pack_size():
+    from openfoodfacts import best_name_match
+    assert best_name_match("Lipton Ice Tea Peach 500ml", LIPTON)["code"] == "2"
+    assert best_name_match("Volvic Lemon & Lime", LIPTON) is None          # brand alone isn't enough
+    assert best_name_match("Oasis", LIPTON) is None                        # one word: too vague
+
+
+def test_items_without_barcode_filled_by_name_with_visible_source(conn):
+    with patch("openfoodfacts._search", return_value=LIPTON):
+        out = fill_missing(conn, {"name": "Lipton Ice Tea Peach 500ml", "allergens": []})
+    assert out["kcal"] == 95.0 and out["ingredients_text"] == "Water, sugar, peach"
+    assert out["external_fields"]["kcal"] == "Open Food Facts (name match: Lipton Peach Ice Tea)"
+
+
+def test_name_match_drops_per_pack_values_when_sizes_differ(conn):
+    only_330 = [LIPTON[0]]
+    with patch("openfoodfacts._search", return_value=only_330):
+        out = fill_missing(conn, {"name": "Lipton Ice Tea Peach 500ml"})
+    assert out.get("kcal") is None and out["ingredients_text"] == "Water, sugar, peach"
+
+
+def test_name_results_cached_in_db(conn):
+    with patch("openfoodfacts._search", return_value=LIPTON) as search:
+        fill_missing(conn, {"name": "Lipton Ice Tea Peach 500ml"})
+        openfoodfacts._search_cache.clear()
+        fill_missing(conn, {"name": "Lipton Peach Ice Tea 500ml"})          # same words, other order
+    assert search.call_count == 1
+
+
+def test_name_matched_allergens_never_clear_an_item():
+    from optimiser import hard_filter
+    from models import Preferences
+    from tests.test_optimiser import TODAY, _item
+    item = _item("x", "shop-a", "main", 2.0, allergens=["milk"]).model_copy(
+        update={"external_fields": {"allergens": "Open Food Facts (name match: Something)"}})
+    assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY) == []
 
 
 def test_network_failure_leaves_gaps(conn):
