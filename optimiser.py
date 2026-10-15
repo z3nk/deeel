@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections import Counter
 from datetime import date, timedelta
 from typing import Optional
 
 from deeel import DeeelScore, deeel_score, ingredient_score
+from openfoodfacts import SOURCE as OFF_SOURCE
 from models import Deal, Item, Lunch, Preferences, Shop
 
 # ---------------------------------------------------------------------------
@@ -108,12 +110,17 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
             if not all(req.lower() in item_flags_lower for req in prefs.diet_flags):
                 continue
 
-        # 3. Allergens — null allergens = unsafe when user has allergen needs
+        # 3. Allergens — unknown = unsafe when the user has allergen needs.
+        # Allergens from Open Food Facts (crowd-sourced) can mark an item unsafe
+        # below, but never make it pass: only printed-label allergens count as known.
         if prefs.allergens_exclude:
-            if item.allergens is None:  # allergens unknown → exclude
+            from_label = not (item.external_fields.get("allergens") or "").startswith(OFF_SOURCE)
+            if not item.allergens:  # allergens unknown → exclude
                 continue
             item_allergens_lower = [a.lower() for a in item.allergens]
             if any(excl.lower() in item_allergens_lower for excl in prefs.allergens_exclude):
+                continue
+            if not from_label:      # online data says it's clear — not trusted for safety
                 continue
 
         # 3b. Temperature preference (only applies to mains)
@@ -251,10 +258,27 @@ def _item_qualifies_for_loyalty(item: Item, prefs: Preferences) -> bool:
     return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
 
 
-def _effective_price(item: Item, prefs: Preferences) -> float:
+def _effective_price(item: Item, prefs: Preferences) -> Optional[float]:
+    """The item's own price (loyalty price if the user has a card). None = deal-only."""
     if item.loyalty_price_gbp is not None and _item_qualifies_for_loyalty(item, prefs):
         return item.loyalty_price_gbp
     return item.price_gbp
+
+
+def _separate_price(items, prefs: Preferences) -> Optional[float]:
+    """Total bought separately, or None if any item is deal-only."""
+    prices = [_effective_price(i, prefs) for i in items]
+    return None if any(p is None for p in prices) else sum(prices)
+
+
+def _price_or_inf(item: Item, prefs: Preferences) -> float:
+    """Sort key: deal-only items (no own price) go last."""
+    price = _effective_price(item, prefs)
+    return float("inf") if price is None else price
+
+
+def _priced(items: list[Item], prefs: Preferences) -> list[Item]:
+    return [i for i in items if _effective_price(i, prefs) is not None]
 
 
 def score_lunch(
@@ -300,6 +324,28 @@ def _deal_qualifies_for_loyalty(deal: Deal, prefs: Preferences) -> bool:
     return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
 
 
+SAMPLE_IMAGE = "fallback.jpg"   # placeholder rows from seed/load_seed.py FALLBACK_ITEMS
+
+
+def is_sample(lunch: Lunch) -> bool:
+    """True if any item in the meal is placeholder (sample) data, not from a real photo."""
+    return any(i.source_image == SAMPLE_IMAGE for i in (lunch.main, lunch.snack, lunch.drink))
+
+
+def shop_deal(deals: list[Deal], shop_id: str) -> Optional[Deal]:
+    """
+    The shop's meal deal. A sign is usually photographed many times, with the odd
+    misread, so take the most frequently seen (name, price, card price); ties → the
+    most recently seen. Standard "Meal Deal" beats "Premium Meal Deal".
+    """
+    candidates = [d for d in deals if d.shop_id == shop_id]
+    if not candidates:
+        return None
+    standard = [d for d in candidates if d.name == "Meal Deal"] or candidates
+    counts = Counter((d.name, d.price_gbp, d.loyalty_price_gbp) for d in standard)
+    return max(standard, key=lambda d: (counts[(d.name, d.price_gbp, d.loyalty_price_gbp)], str(d.last_seen)))
+
+
 def _deal_price(deal: Deal, prefs: Preferences) -> float:
     if deal.loyalty_price_gbp and _deal_qualifies_for_loyalty(deal, prefs):
         return deal.loyalty_price_gbp
@@ -308,7 +354,7 @@ def _deal_price(deal: Deal, prefs: Preferences) -> float:
 
 def lunch_deeel(lunch: Lunch, prefs: Preferences) -> DeeelScore:
     """Deeel score for an already-built Lunch (used by the UI for every sort mode)."""
-    sep = sum(_effective_price(i, prefs) for i in (lunch.main, lunch.snack, lunch.drink))
+    sep = _separate_price((lunch.main, lunch.snack, lunch.drink), prefs)
     return deeel_score(lunch.main, lunch.snack, lunch.drink, lunch.price_gbp, sep)
 
 
@@ -321,7 +367,7 @@ def _shortlist(items: list[Item], prefs: Preferences) -> list[Item]:
         return items
     picks: dict[str, Item] = {}
     rankings = [
-        sorted(items, key=lambda i: _effective_price(i, prefs)),
+        sorted(items, key=lambda i: _price_or_inf(i, prefs)),
         sorted(items, key=lambda i: -ingredient_score(i)[0]),
         sorted(items, key=lambda i: -(i.protein_g or 0)),
     ]
@@ -335,13 +381,13 @@ def _deeel_lunch(shop, main, snack, drink, deal, prefs) -> Optional[Lunch]:
     """Build a Lunch for this trio at its cheapest price, or None if over the cap/limits."""
     if _has_nutrition_limit(prefs) and not _meal_nutrition_ok(main, snack, drink, prefs):
         return None
-    sep = _effective_price(main, prefs) + _effective_price(snack, prefs) + _effective_price(drink, prefs)
+    sep = _separate_price((main, snack, drink), prefs)
     price, used_deal, deal_obj = sep, False, None
     if deal is not None and main.meal_deal_eligible and snack.meal_deal_eligible and drink.meal_deal_eligible:
         dp = _deal_price(deal, prefs)
-        if dp < sep:
+        if sep is None or dp < sep:
             price, used_deal, deal_obj = dp, True, deal
-    if price > (prefs.max_price_gbp or P_MAX_DEFAULT):
+    if price is None or price > (prefs.max_price_gbp or P_MAX_DEFAULT):
         return None
     return Lunch(
         shop=shop, main=main, snack=snack, drink=drink,
@@ -352,7 +398,7 @@ def _deeel_lunch(shop, main, snack, drink, deal, prefs) -> Optional[Lunch]:
 
 def _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs) -> list[Lunch]:
     """Best Deeel lunch for each main at this shop, best first."""
-    deal = next((d for d in deals if d.shop_id == shop.shop_id), None)
+    deal = shop_deal(deals, shop.shop_id)
     snacks, drinks = _shortlist(snacks, prefs), _shortlist(drinks, prefs)
     results = []
     for main in mains:
@@ -406,18 +452,13 @@ def best_lunch_for_shop(
         return w_q * q + w_h * h
 
     key = lambda i: _item_score(i, prefs)
-    trio = _best_trio(mains, snacks, drinks, prefs, key)
-    if trio is None:
-        return None
-    best_main, best_snack, best_drink = trio
+    # Separate mode can only use items with their own price (deal-only items excluded)
+    p_mains, p_snacks, p_drinks = _priced(mains, prefs), _priced(snacks, prefs), _priced(drinks, prefs)
+    trio = _best_trio(p_mains, p_snacks, p_drinks, prefs, key) if p_mains and p_snacks and p_drinks else None
+    sep_price = _separate_price(trio, prefs) if trio else None
 
-    sep_price = (
-        _effective_price(best_main, prefs)
-        + _effective_price(best_snack, prefs)
-        + _effective_price(best_drink, prefs)
-    )
-
-    if sep_price <= p_max:
+    if trio is not None and sep_price <= p_max:
+        best_main, best_snack, best_drink = trio
         sep_score = score_lunch(best_main, best_snack, best_drink, sep_price, prefs)
         best = Lunch(
             shop=shop,
@@ -430,9 +471,8 @@ def best_lunch_for_shop(
         )
 
     # ---- Deal mode ----
-    shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
-    if shop_deals:
-        deal = shop_deals[0]  # use the first (best) deal; could rank if multiple
+    deal = shop_deal(deals, shop.shop_id)
+    if deal is not None:
         deal_price = _deal_price(deal, prefs)
 
         deal_mains  = [i for i in mains  if i.meal_deal_eligible]
@@ -524,7 +564,7 @@ def top_lunches_for_shop(
         return _deeel_lunches_by_main(shop, mains, snacks, drinks, deals, prefs)[:n]
 
     p_max = prefs.max_price_gbp or P_MAX_DEFAULT
-    shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
+    the_deal = shop_deal(deals, shop.shop_id)
 
     def _item_score(item: Item) -> float:
         w_p, w_q, w_h = _weights_from_sort(prefs)
@@ -535,30 +575,36 @@ def top_lunches_for_shop(
     ranked_mains = sorted(mains, key=_item_score, reverse=True)
     results: list[Lunch] = []
 
+    def _priced_lunch(main, best_snack, best_drink):
+        """(price, used_deal, deal) for this trio, or None if it can't be bought within the cap."""
+        sep_price = _separate_price((main, best_snack, best_drink), prefs)
+        price, used_deal, deal_obj = sep_price, False, None
+        if the_deal and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
+            d = the_deal
+            dp = _deal_price(d, prefs)
+            if (sep_price is None or dp < sep_price) and dp <= p_max:
+                price, used_deal, deal_obj = dp, True, d
+        return None if price is None or price > p_max else (price, used_deal, deal_obj)
+
+    deal_snacks = [i for i in snacks if i.meal_deal_eligible]
+    deal_drinks = [i for i in drinks if i.meal_deal_eligible]
+
     for main in ranked_mains:
         if len(results) == n:
             break
-        sides = _best_sides(main, snacks, drinks, prefs, _item_score)
-        if sides is None:
+        # Best sides overall; if that trio can't be priced (e.g. a deal-only side
+        # with a main outside the deal), fall back to deal-eligible sides
+        priced = None
+        for pool_s, pool_d in ((snacks, drinks), (deal_snacks, deal_drinks)):
+            if not pool_s or not pool_d:
+                continue
+            sides = _best_sides(main, pool_s, pool_d, prefs, _item_score)
+            if sides and (priced := _priced_lunch(main, *sides)):
+                best_snack, best_drink = sides
+                break
+        if not priced:
             continue
-        best_snack, best_drink = sides
-        sep_price = (
-            _effective_price(main, prefs)
-            + _effective_price(best_snack, prefs)
-            + _effective_price(best_drink, prefs)
-        )
-        if sep_price > p_max:
-            continue
-
-        used_deal = False
-        price = sep_price
-        deal_obj = None
-
-        if shop_deals and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
-            d = shop_deals[0]
-            dp = _deal_price(d, prefs)
-            if dp < sep_price and dp <= p_max:
-                price, used_deal, deal_obj = dp, True, d
+        price, used_deal, deal_obj = priced
 
         results.append(Lunch(
             shop=shop,

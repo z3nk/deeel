@@ -66,8 +66,18 @@ def meta_set(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.commit()
 
 
-def export_snapshot(conn: sqlite3.Connection, path: Path = SNAPSHOT_PATH) -> dict:
+def _one_deal_per_shop(rows: list[dict]) -> list[dict]:
+    """The same sign is photographed many times; publish only the deal the app would use."""
+    from models import Deal
+    from optimiser import shop_deal
+    deals = [Deal(**{**r, "last_seen": r["last_seen"]}) for r in rows]
+    chosen = {d.deal_id for d in (shop_deal(deals, s) for s in {r["shop_id"] for r in rows}) if d}
+    return [r for r in rows if r["deal_id"] in chosen]
+
+
+def export_snapshot(conn: sqlite3.Connection, path: Path | None = None) -> dict:
     """Write approved, non-placeholder items and deals to JSON. Returns counts."""
+    path = path or SNAPSHOT_PATH   # looked up at call time so tests can redirect it
     items = []
     for row in conn.execute(
         "SELECT * FROM items WHERE status = 'approved' AND source_image != ? ORDER BY shop_id, category, name",
@@ -77,10 +87,10 @@ def export_snapshot(conn: sqlite3.Connection, path: Path = SNAPSHOT_PATH) -> dic
         for col in _JSON_COLUMNS & d.keys():
             d[col] = json.loads(d[col]) if d[col] else ([] if col in ("diet_flags", "allergens") else None)
         items.append(d)
-    deals = [dict(r) for r in conn.execute(
+    deals = _one_deal_per_shop([dict(r) for r in conn.execute(
         "SELECT * FROM deals WHERE status = 'approved' AND source_image != ? ORDER BY shop_id, name",
         (_FALLBACK_IMAGE,),
-    )]
+    )])
     payload = {
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "counts": {"items": len(items), "deals": len(deals)},
@@ -92,8 +102,9 @@ def export_snapshot(conn: sqlite3.Connection, path: Path = SNAPSHOT_PATH) -> dic
     return payload["counts"]
 
 
-def sync_snapshot(conn: sqlite3.Connection, path: Path = SNAPSHOT_PATH) -> bool:
+def sync_snapshot(conn: sqlite3.Connection, path: Path | None = None) -> bool:
     """Load the snapshot into this DB if it changed. Returns True if a snapshot is present."""
+    path = path or SNAPSHOT_PATH
     if not path.exists():
         return False
     raw = path.read_bytes()

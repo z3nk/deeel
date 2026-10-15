@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS items (
     shop_id             TEXT NOT NULL REFERENCES shops(shop_id),
     name                TEXT NOT NULL,
     category            TEXT NOT NULL,
-    price_gbp           REAL NOT NULL,
+    price_gbp           REAL,           -- NULL = deal-only (only a meal deal price shown)
     loyalty_price_gbp   REAL,
     meal_deal_eligible  INTEGER,        -- 1/0/NULL
     temperature         TEXT NOT NULL,
@@ -283,6 +283,7 @@ def get_connection() -> sqlite3.Connection:
 def _init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(_SCHEMA)
     _migrate(conn)
+    _migrate_nullable_price(conn)
     _migrate_tasks(conn)
     _seed_shops(conn)
     _rename_shops(conn)
@@ -298,6 +299,25 @@ _ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL",
 # Bump when FALLBACK_ITEMS/FALLBACK_* data in seed/load_seed.py changes, so existing
 # databases (including the deployed one) drop and reload their fallback rows.
 FALLBACK_DATA_VERSION = 2
+
+
+def _migrate_nullable_price(conn: sqlite3.Connection) -> None:
+    """items.price_gbp used to be NOT NULL. SQLite can't drop that in place, so rebuild."""
+    info = {r["name"]: r for r in conn.execute("PRAGMA table_info(items)")}
+    if not info["price_gbp"]["notnull"]:
+        return
+    import re
+    ddl = re.search(r"CREATE TABLE IF NOT EXISTS items \((.*?)\n\);", _SCHEMA, re.S).group(1)
+    cols = ", ".join(info)
+    conn.executescript(f"""
+        CREATE TABLE items__new ({ddl}
+        );
+        INSERT INTO items__new ({cols}) SELECT {cols} FROM items;
+        DROP TABLE items;
+        ALTER TABLE items__new RENAME TO items;
+    """)
+    conn.executescript(_SCHEMA)   # recreate indexes
+    conn.commit()
 
 
 def _migrate_tasks(conn: sqlite3.Connection) -> None:

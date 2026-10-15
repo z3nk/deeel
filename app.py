@@ -32,7 +32,7 @@ from db import (
     get_user_credit_balance,
     upsert_user,
 )
-from extract import build_deal, build_item, extract_photo
+from extract import build_deal, build_item, extract_photo, is_usable
 from nutrition_fill import fill_existing, fill_missing
 from demo import screen_demo
 from deeel import LABELS as DEEEL_LABELS, WEIGHTS as DEEEL_WEIGHTS
@@ -46,6 +46,8 @@ from shop_images import logo_html, storefront_path
 from models import Preferences
 from optimiser import (
     get_results,
+    is_sample,
+    shop_deal,
     lunch_deeel,
     hard_filter,
     _row_to_item,
@@ -110,6 +112,22 @@ def _ensure_user():
 # ---------------------------------------------------------------------------
 
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
+
+# Shown wherever allergen data appears
+ALLERGY_WARNING_SHORT = "⚠️ computer-read — check the pack"
+ALLERGY_WARNING = (
+    "⚠️ **Allergen information is read by computer** — from our photos of shelf labels and, "
+    "where a photo didn't show it, from online data (Open Food Facts). It can be wrong or "
+    "incomplete. **Always check the packaging yourself before eating.**"
+)
+
+
+def _allergen_text(item) -> str:
+    """'Allergens: milk, gluten (Open Food Facts) · ⚠️ computer-read — check the pack'."""
+    allergens = ", ".join(item.allergens) if item.allergens else "none found on label"
+    source = item.external_fields.get("allergens")
+    via = f" ({source})" if source else ""
+    return f"Allergens: {allergens}{via} · {ALLERGY_WARNING_SHORT}"
 DIETS     = ["Vegetarian", "Vegan", "Halal", "Kosher"]
 MEATS     = ["Chicken", "Beef", "Pork", "Lamb", "Turkey", "Duck", "Fish"]
 KCAL_CAP  = 1500   # slider max = no calorie limit
@@ -155,6 +173,7 @@ def render_sidebar() -> Preferences:
         label_visibility="collapsed",
         placeholder="Choose allergies to avoid...",
     )
+    st.sidebar.caption(ALLERGY_WARNING)
     st.sidebar.divider()
 
     # Diet
@@ -257,14 +276,13 @@ def _freshness_badge(last_seen_str: str) -> str:
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
-    unknown = any(not i.allergens and i.allergens is not None for i in items_list)
-    # null allergens (empty list + unknown) handled at filter level
-    has_null = any(i.allergens is None for i in items_list)
-    if has_null:
-        return "⚠️ **Allergens not checked** — label had no allergen text"
     all_allergens = sorted({a for i in items_list for a in i.allergens})
-    allergen_str = ", ".join(all_allergens) if all_allergens else "none listed"
-    return f"Contains (from label): {allergen_str}"
+    allergen_str = ", ".join(all_allergens) if all_allergens else "none found on labels"
+    if any(not i.allergens for i in items_list):
+        allergen_str += " (some items' allergens unknown)"
+    if any("allergens" in i.external_fields for i in items_list):
+        allergen_str += " (partly from Open Food Facts / other photos)"
+    return f"Allergens: {allergen_str} · {ALLERGY_WARNING_SHORT}"
 
 
 def _nutrition_line(items_list) -> str:
@@ -301,6 +319,16 @@ def _keep_sources(original: dict, row: dict) -> dict:
         if field in sources and _clean_number(row[field]) != _clean_number(original.get(field)):
             sources.pop(field)
     return sources
+
+
+def _fmt_price(item) -> str:
+    """'£3.50', or 'meal deal only' when the shelf only showed a meal deal price."""
+    return "meal deal only" if item.price_gbp is None else f"£{item.price_gbp:.2f}"
+
+
+def _separate_total(items_list) -> float | None:
+    """Total bought separately, or None if any item is only sold in the meal deal."""
+    return None if any(i.price_gbp is None for i in items_list) else sum(i.price_gbp for i in items_list)
 
 
 def _item_nutrition(item) -> str:
@@ -399,11 +427,17 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         with col1:
             rank_str = f"#{rank} " if rank > 0 else ""
             badge = ' <span style="background:#0F7B5F;color:white;font-size:10px;padding:2px 8px;border-radius:999px">Best match</span>' if featured else ""
+            if is_sample(lunch):
+                badge += (' <span style="background:#F1F5F9;color:#475569;border:1px dashed #94A3B8;font-size:10px;'
+                          'padding:2px 8px;border-radius:999px">Sample data</span>')
             st.markdown(
                 f"{logo_html(lunch.shop)}<b>{rank_str}{lunch.shop.name}</b>{badge}",
                 unsafe_allow_html=True,
             )
             st.caption(f"{lunch.shop.walking_minutes:.0f} min walk")
+            if is_sample(lunch):
+                st.caption("⚠️ Sample data — we haven't photographed this shop yet, so these "
+                           "products and prices are placeholders.")
             st.markdown(
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}"
             )
@@ -419,9 +453,11 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                 st.caption(f"*{lunch.why}*")
 
         with col2:
-            sep_price = lunch.main.price_gbp + lunch.snack.price_gbp + lunch.drink.price_gbp
+            sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink])
             st.markdown(f"### £{lunch.price_gbp:.2f}")
-            if lunch.used_deal and sep_price > lunch.price_gbp:
+            if lunch.used_deal and sep_price is None:
+                st.caption("✅ Meal deal — some items are only priced as part of the deal")
+            elif lunch.used_deal and sep_price > lunch.price_gbp:
                 st.markdown(
                     f'<span style="text-decoration:line-through;color:#94A3B8">£{sep_price:.2f} separately</span>',
                     unsafe_allow_html=True,
@@ -506,6 +542,8 @@ def screen_find(prefs: Preferences):
 
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
         st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
+
+        st.caption(ALLERGY_WARNING)
 
         # Section A — featured best option
         st.markdown("#### Your best option")
@@ -653,6 +691,9 @@ def screen_detail():
     st.markdown(f"<h2>{logo_html(shop, size=40)}{shop.name}</h2>", unsafe_allow_html=True)
     # Pull the why from the last ranked result for this shop if available
     why_text = st.session_state.get(f"why_{shop_id}", "")
+    if any(i.shop_id == shop_id and i.source_image == "fallback.jpg" for i in all_items):
+        st.info("**Sample data.** We haven't photographed this shop yet — the products and "
+                "prices below are placeholders, not real readings.")
     sub = f"{shop.walking_minutes:.0f} min walk from campus"
     if why_text:
         sub += f" · {why_text}"
@@ -674,7 +715,7 @@ def screen_detail():
         hot = " · hot" if item.temperature == "hot" else ""
         nd = " · not in deal" if item.meal_deal_eligible is False else ""
         pend = " · unverified" if item.status == "pending" else ""
-        return f"{item.name} — £{item.price_gbp:.2f}{hot}{nd}{pend}"
+        return f"{item.name} — {_fmt_price(item)}{hot}{nd}{pend}"
 
     key_prefix = f"detail_{shop_id}"
 
@@ -684,6 +725,7 @@ def screen_detail():
         if pending in st.session_state:
             st.session_state[f"{key_prefix}_{cat}"] = st.session_state.pop(pending)
 
+    st.warning(ALLERGY_WARNING)
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -697,9 +739,8 @@ def screen_detail():
         st.markdown(f"**{main.name}**")
         if main.temperature == "hot":
             st.caption("🔥 hot")
-        st.caption(f"£{main.price_gbp:.2f}")
-        allergens_str = ", ".join(main.allergens) if main.allergens else ("not checked" if main.allergens is None else "none listed")
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_fmt_price(main))
+        st.caption(_allergen_text(main))
         st.caption(_item_nutrition(main))
         st.markdown(_freshness_badge(str(main.last_seen)), unsafe_allow_html=True)
         if main.status == "pending":
@@ -714,9 +755,8 @@ def screen_detail():
         )
         snack = snacks[snack_idx]
         st.markdown(f"**{snack.name}**")
-        st.caption(f"£{snack.price_gbp:.2f}")
-        allergens_str = ", ".join(snack.allergens) if snack.allergens else "none listed"
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_fmt_price(snack))
+        st.caption(_allergen_text(snack))
         st.caption(_item_nutrition(snack))
         st.markdown(_freshness_badge(str(snack.last_seen)), unsafe_allow_html=True)
 
@@ -729,9 +769,8 @@ def screen_detail():
         )
         drink = drinks[drink_idx]
         st.markdown(f"**{drink.name}**")
-        st.caption(f"£{drink.price_gbp:.2f}")
-        allergens_str = ", ".join(drink.allergens) if drink.allergens else "none listed"
-        st.caption(f"Allergens: {allergens_str}")
+        st.caption(_fmt_price(drink))
+        st.caption(_allergen_text(drink))
         st.caption(_item_nutrition(drink))
         st.markdown(_freshness_badge(str(drink.last_seen)), unsafe_allow_html=True)
 
@@ -747,15 +786,15 @@ def screen_detail():
     st.divider()
 
     # Pricing comparison
-    sep_price = main.price_gbp + snack.price_gbp + drink.price_gbp
+    sep_price = _separate_total([main, snack, drink])   # None = a deal-only item is picked
     deal_eligible = (
         main.meal_deal_eligible is not False
         and snack.meal_deal_eligible is not False
         and drink.meal_deal_eligible is not False
     )
-    deal = shop_deals[0] if shop_deals else None
+    deal = shop_deal(shop_deals, shop_id)
     deal_price = deal.price_gbp if deal else None
-    is_deal_better = deal_price is not None and deal_eligible and deal_price < sep_price
+    is_deal_better = deal_price is not None and deal_eligible and (sep_price is None or deal_price < sep_price)
 
     pc1, pc2 = st.columns(2)
     with pc1:
@@ -768,14 +807,20 @@ def screen_detail():
                 st.caption("An item you picked isn't in the meal deal.")
             else:
                 st.markdown(f"**£{deal.price_gbp:.2f}**")
-                if is_deal_better:
+                if is_deal_better and sep_price is not None:
                     st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
+                elif is_deal_better:
+                    st.caption("✅ Best option")
 
     with pc2:
         with st.container(border=True):
             st.caption("Bought separately")
-            st.markdown(f"**£{sep_price:.2f}**")
-            if not is_deal_better:
+            if sep_price is None:
+                st.markdown("**Not available**")
+                st.caption("An item you picked is only priced as part of the meal deal.")
+            else:
+                st.markdown(f"**£{sep_price:.2f}**")
+            if not is_deal_better and sep_price is not None:
                 st.caption("✅ Best option")
 
     st.divider()
@@ -800,7 +845,7 @@ def screen_detail():
         hot_tag = " · 🔥 hot" if item.temperature == "hot" else ""
         nd_tag = " · *not in deal*" if item.meal_deal_eligible is False else ""
         pend_tag = " · ⚠️ unverified" if item.status == "pending" else ""
-        allergens = ", ".join(item.allergens) if item.allergens else ("not checked" if item.allergens is None else "none")
+        allergens = _allergen_text(item).removeprefix("Allergens: ")
 
         row_cols = st.columns([3, 1, 1, 2, 1, 1])
         with row_cols[0]:
@@ -811,7 +856,7 @@ def screen_detail():
         with row_cols[1]:
             st.caption(item.category.upper())
         with row_cols[2]:
-            st.markdown(f"£{item.price_gbp:.2f}")
+            st.markdown(_fmt_price(item))
         with row_cols[3]:
             st.caption(allergens)
         with row_cols[4]:
@@ -859,7 +904,9 @@ def _read_photos(conn, files, shop_id: str, photo_type: str) -> list[dict]:
             else:
                 result = extract_photo(saved.path, shop_id, photo_type)
                 entry.update(kind=result.kind, notes=result.notes,
-                             items=[fill_missing(conn, i) for i in result.items],
+                             # barcode lookups only: name searches are rate-limited (~6s each),
+                             # so they run later via the Review queue / --fill-off
+                             items=[fill_missing(conn, i, use_name_search=False) for i in result.items],
                              deals=result.deals)
         except Exception as exc:
             entry["error"] = str(exc)
@@ -876,7 +923,7 @@ _ITEM_COLUMNS = ["include", "name", "category", "price_gbp", "meal_deal_eligible
 def _items_frame(items: list[dict]):
     import pandas as pd
     rows = [{
-        "include": i.get("price_gbp") is not None,
+        "include": is_usable(i),
         "name": i.get("name", ""),
         "category": i.get("category") if i.get("category") in ("main", "snack", "drink") else "main",
         "price_gbp": i.get("price_gbp"),
@@ -934,7 +981,7 @@ def _render_batch(batch: list[dict], nonce: int) -> tuple[dict, dict, dict]:
                         "temperature": st.column_config.SelectboxColumn("Temp", options=["hot", "cold", "ambient"]),
                         "kcal": st.column_config.NumberColumn("kcal", min_value=0),
                         "protein_g": st.column_config.NumberColumn("Protein g", min_value=0.0),
-                        "allergens": st.column_config.TextColumn("Allergens (from label)"),
+                        "allergens": st.column_config.TextColumn("Allergens (computer-read — check)"),
                         "filled_from": st.column_config.TextColumn("Not from this label"),
                         "confidence": st.column_config.TextColumn("Read quality"),
                     },
@@ -986,15 +1033,17 @@ def _submit_batch(conn, batch, edited_items, edited_deals, banners, user_id) -> 
                 continue
             name = (row["name"] or "").strip()
             price = _clean_number(row["price_gbp"])
-            if not name or price is None:
-                problems.append(f"{entry['file']}: '{name or 'unnamed'}' needs a name and price — skipped")
+            in_deal = None if row["meal_deal_eligible"] is None else bool(row["meal_deal_eligible"])
+            if not name or (price is None and in_deal is not True):
+                problems.append(f"{entry['file']}: '{name or 'unnamed'}' needs a name, and a price "
+                                "or 'In deal' ticked — skipped")
                 continue
             fields = {
                 **entry["items"][row_no],          # keeps ingredients, diet flags, meats, label text
                 "name": name,
                 "category": row["category"],
                 "price_gbp": price,
-                "meal_deal_eligible": None if row["meal_deal_eligible"] is None else bool(row["meal_deal_eligible"]),
+                "meal_deal_eligible": in_deal,
                 "temperature": row["temperature"],
                 "kcal": _clean_number(row["kcal"]),
                 "protein_g": _clean_number(row["protein_g"]),
@@ -1102,7 +1151,8 @@ def screen_upload():
     if batch:
         st.markdown("#### What we found")
         st.caption("Check each product, fix anything wrong, untick anything that isn't right. "
-                   "⚠️ Allergen info is from the label only.")
+                   "Allergens are read by computer and must be checked against the pack.")
+        st.caption(ALLERGY_WARNING)
         edited_items, edited_deals, banners = _render_batch(batch, nonce)
         n_ticked = sum(int(f["include"].sum()) for f in edited_items.values()) + \
                    sum(int(f["include"].sum()) for f in edited_deals.values())
@@ -1299,8 +1349,9 @@ def _record_line(row: dict) -> str:
     allergens = json.loads(row.get("allergens") or "[]")
     flag = " · ⚠️ unclear read" if row.get("needs_review") else ""
     return (
-        f"**{row.get('name', '')}** · {row.get('category', '').upper()} · £{row.get('price_gbp', 0):.2f} · "
-        f"allergens: {', '.join(allergens) if allergens else 'not on label'}{flag}"
+        f"**{row.get('name', '')}** · {row.get('category', '').upper()} · "
+        f"{'meal deal only' if row.get('price_gbp') is None else f'£{row["price_gbp"]:.2f}'} · "
+        f"allergens: {', '.join(allergens) if allergens else 'not on label'} ({ALLERGY_WARNING_SHORT}){flag}"
     )
 
 
@@ -1333,13 +1384,17 @@ def screen_review():
                     "seed/approved.json — now commit and push it.")
                 st.rerun()
 
-    with st.expander("Fill missing nutrition by barcode"):
-        st.caption("For products with a barcode but no kcal / protein / ingredients: first our own "
-                   "label data for the same barcode, then Open Food Facts. Allergens are never filled.")
-        if st.button("Fill missing now", key="fill_missing"):
+    with st.expander("Fill missing allergens / nutrition / ingredients"):
+        st.caption("For every product missing kcal, protein, ingredients or allergens: our own label data "
+                   "for the same barcode, then Open Food Facts by barcode, then by product name (strict match; "
+                   "the matched product is shown as the source). Open Food Facts allergens are shown with a "
+                   "warning and never clear an item for an allergy filter. Name searches are rate-limited, so "
+                   "this does 10 products per click — for everything at once run "
+                   "`python seed/load_seed.py --fill-off`.")
+        if st.button("Fill next 10 products", key="fill_missing"):
             if is_admin():
-                with st.spinner("Looking up barcodes…"):
-                    checked, filled = fill_existing(conn)
+                with st.spinner("Looking up products (about 6 seconds each)…"):
+                    checked, filled = fill_existing(conn, limit=10)
                 _load_data.clear()
                 st.session_state["review_flash"] = f"Checked {checked} product(s), filled {filled} field(s)."
                 st.rerun()

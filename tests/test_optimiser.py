@@ -57,7 +57,7 @@ def _item(
         price_gbp=price,
         temperature=temperature,
         diet_flags=diet_flags or [],
-        allergens=allergens,
+        allergens=allergens or [],
         meal_deal_eligible=meal_deal_eligible,
         source_image="test.jpg",
         source_text="test",
@@ -144,17 +144,10 @@ class TestHardFilter:
 
     def test_null_allergens_excluded_when_filter_set(self):
         """Item with unknown allergens must be excluded if user has allergen needs."""
-        item = _item("unknown", "shop-a", "main", 2.00, allergens=None)
+        item = _item("unknown", "shop-a", "main", 2.00, allergens=[])
         prefs = Preferences(allergens_exclude=["nuts"])
         result = hard_filter([item], prefs, today=TODAY)
         assert result == []
-
-    def test_item_without_allergens_kept_when_filter_set(self):
-        """Item with no allergens (e.g. water or fruit) must be kept if it doesn't contain avoided allergen."""
-        item = _item("safe", "shop-a", "snack", 1.00, allergens=[])
-        prefs = Preferences(allergens_exclude=["nuts"])
-        result = hard_filter([item], prefs, today=TODAY)
-        assert len(result) == 1
 
     def test_diet_flag_required(self):
         non_veg = _item("meat", "shop-a", "main", 2.00, diet_flags=[])
@@ -352,3 +345,106 @@ class TestLoyaltyCards:
         assert _deal_price(deal, Preferences(has_nectar=False)) == 4.50
         assert _deal_price(deal, Preferences(has_nectar=True)) == 3.50
         assert _deal_price(deal, Preferences(has_clubcard=True)) == 4.50
+
+
+# ---------------------------------------------------------------------------
+# Deal-only items (no own price; only a meal deal price on the shelf)
+# ---------------------------------------------------------------------------
+
+class TestDealOnlyItems:
+    ITEMS = [
+        _item("deal-main", "shop-a", "main", 0, quality_rating=5),
+        _item("own-main",  "shop-a", "main", 3.00, quality_rating=2),
+        _item("s",         "shop-a", "snack", 1.00),
+        _item("d",         "shop-a", "drink", 1.00),
+    ]
+    # price 0 placeholder above → make the first truly deal-only
+    ITEMS[0] = ITEMS[0].model_copy(update={"price_gbp": None})
+
+    def test_deal_only_main_used_in_deal(self):
+        deal = [_deal("deal", "shop-a", 3.85)]
+        # Quality sort: the better-rated deal-only main wins, at the deal price
+        lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, deal, Preferences(sort="quality"))
+        assert lunch.main.item_id == "deal-main" and lunch.used_deal and lunch.price_gbp == 3.85
+        # Deeel: same £3.85, but the priced main has a KNOWN saving (£5 → £3.85), so it edges ahead;
+        # the deal-only main is still offered as an alternative
+        primary, alts, _ = get_results([SHOP_A], self.ITEMS, deal, Preferences(sort="deeel"), today=TODAY)
+        assert primary.main.item_id == "own-main" and primary.used_deal
+        assert [l.main.item_id for l in alts] == ["deal-main"] and alts[0].price_gbp == 3.85
+
+    def test_deal_only_main_never_bought_separately(self):
+        for sort in ("quality", "deeel"):
+            lunch = best_lunch_for_shop(SHOP_A, self.ITEMS, [], Preferences(sort=sort))
+            assert lunch.main.item_id == "own-main" and not lunch.used_deal and lunch.price_gbp == 5.00
+
+    def test_no_priced_main_and_no_deal_means_no_lunch(self):
+        items = [self.ITEMS[0], self.ITEMS[2], self.ITEMS[3]]
+        assert best_lunch_for_shop(SHOP_A, items, [], Preferences()) is None
+
+    def test_alternatives_include_deal_only_mains(self):
+        _, alts, _ = get_results([SHOP_A], self.ITEMS, [_deal("deal", "shop-a", 3.85)], Preferences(), today=TODAY)
+        primary_and_alts = {l.main.item_id for l in alts} | {"deal-main"}
+        assert primary_and_alts == {"deal-main", "own-main"}
+
+    def test_deeel_score_partial_when_separate_price_unknown(self):
+        from optimiser import lunch_deeel
+        only_deal_main = [self.ITEMS[0], self.ITEMS[2], self.ITEMS[3]]
+        lunch = best_lunch_for_shop(SHOP_A, only_deal_main, [_deal("deal", "shop-a", 3.85)], Preferences(sort="deeel"))
+        d = lunch_deeel(lunch, Preferences())
+        assert d.parts["deal"] == 0.5 and d.partial
+
+
+def test_build_item_requires_price_or_meal_deal():
+    from datetime import date as _d
+    from extract import build_item
+    ok = build_item({"name": "Wrap", "category": "main", "price_gbp": None, "meal_deal_eligible": True,
+                     "confidence": "high"}, "shop-a", "x.jpg", _d(2026, 10, 15), None)
+    assert ok.price_gbp is None
+    with pytest.raises(ValueError):
+        build_item({"name": "Wrap", "category": "main", "price_gbp": None, "meal_deal_eligible": None,
+                    "confidence": "high"}, "shop-a", "x.jpg", _d(2026, 10, 15), None)
+
+
+def test_shop_deal_uses_most_frequently_read_sign():
+    from optimiser import shop_deal
+    deals = [_deal(f"good{i}", "shop-a", 4.25) for i in range(5)] + [_deal("misread", "shop-a", 3.0),
+                                                                     _deal("other", "shop-b", 5.0)]
+    assert shop_deal(deals, "shop-a").price_gbp == 4.25
+    assert shop_deal(deals, "shop-b").price_gbp == 5.0
+    assert shop_deal(deals, "shop-c") is None
+
+
+def test_is_sample_flags_placeholder_meals():
+    from optimiser import is_sample
+    real = best_lunch_for_shop(SHOP_A, ITEMS_A, [], Preferences())
+    assert not is_sample(real)
+    placeholder = real.main.model_copy(update={"source_image": "fallback.jpg"})
+    assert is_sample(real.model_copy(update={"main": placeholder}))
+
+
+
+class TestAllergenSources:
+    """Online (Open Food Facts) allergens can exclude an item but never clear it."""
+
+    def _with(self, allergens, source):
+        item = _item("x", "shop-a", "main", 2.00, allergens=allergens)
+        return item.model_copy(update={"external_fields": {"allergens": source} if source else {}})
+
+    def test_label_allergens_pass_filter(self):
+        assert hard_filter([self._with(["milk"], None)], Preferences(allergens_exclude=["nuts"]), today=TODAY)
+
+    def test_same_barcode_label_allergens_pass_filter(self):
+        item = self._with(["milk"], "same barcode, another photo")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY)
+
+    def test_off_allergens_never_clear_an_item(self):
+        item = self._with(["milk"], "Open Food Facts")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY) == []
+
+    def test_off_allergens_still_exclude(self):
+        item = self._with(["nuts"], "Open Food Facts")
+        assert hard_filter([item], Preferences(allergens_exclude=["nuts"]), today=TODAY) == []
+
+    def test_no_allergy_filter_shows_everything(self):
+        assert hard_filter([self._with(["milk"], "Open Food Facts")], Preferences(), today=TODAY)
+

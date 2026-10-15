@@ -484,16 +484,23 @@ def extract_photo(image_path: Path, shop_id: str, photo_type: str) -> PhotoExtra
                 raise RuntimeError(f"extract_photo failed after 2 attempts for {Path(image_path).name}: {exc}") from exc
 
 
+def is_usable(fields: dict) -> bool:
+    """A product is worth storing if it has its own price, or is a deal-only meal deal item."""
+    return fields.get("price_gbp") is not None or fields.get("meal_deal_eligible") is True
+
+
 def build_item(fields: dict, shop_id: str, source_rel: str, photo_date: date,
                submitted_by: str | None, submitted_via: str = "upload") -> Item:
     """Turn one (possibly user-edited) extracted product into a validated pending Item."""
+    if not is_usable(fields):
+        raise ValueError("needs its own price, or to be in the meal deal")
     confidence = fields.get("confidence") if fields.get("confidence") in ("high", "medium", "low") else "medium"
     return Item(
         item_id=str(uuid.uuid4())[:8],
         shop_id=shop_id,
         name=fields["name"],
         category=fields["category"],
-        price_gbp=float(fields["price_gbp"]),
+        price_gbp=None if fields.get("price_gbp") is None else float(fields["price_gbp"]),
         loyalty_price_gbp=fields.get("loyalty_price_gbp"),
         meal_deal_eligible=fields.get("meal_deal_eligible"),
         temperature=fields.get("temperature") or "ambient",

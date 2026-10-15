@@ -15,7 +15,7 @@ import math
 import folium
 
 from models import Lunch, Shop
-from optimiser import WALK_SPEED_MPM
+from optimiser import WALK_SPEED_MPM, is_sample
 from shop_images import brand_colour, brand_text_colour, logo_html
 
 # UCL Main Quad, Gower Street
@@ -102,11 +102,12 @@ def build_map(
             colour = brand_colour(shop.chain)
             num_colour = brand_text_colour(shop.chain)
             deal_label = "Meal deal" if lunch.used_deal else "Separate"
+            sample_note = "<br><i>Sample data — not photographed yet</i>" if is_sample(lunch) else ""
             popup_html = (
                 f"{logo_html(shop, size=22)}<b>#{rank} {shop.name}</b><br>"
                 f"{shop.walking_minutes:.0f} min walk<br>"
                 f"{lunch.main.name} + {lunch.snack.name} + {lunch.drink.name}<br>"
-                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}<br>"
+                f"<b>£{lunch.price_gbp:.2f}</b> · {deal_label}{sample_note}<br>"
                 f'<div style="margin-top:8px;">'
                 f'<a href="/?shop={shop.shop_id}" target="_blank" style="'
                 f'display:inline-block;padding:5px 12px;background:#0F7B5F;color:#ffffff;'
@@ -114,7 +115,7 @@ def build_map(
                 f'">See basket ↗</a>'
                 f'</div>'
             )
-            marker_tooltip = f"#{rank} {shop.name}"
+            marker_tooltip = f"#{rank} {shop.name}" + (" (sample data)" if is_sample(lunch) else "")
         else:
             colour = COLOUR_GREY
             num_colour = "#FFFFFF"

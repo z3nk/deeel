@@ -156,7 +156,7 @@ pytest tests/test_importer.py
 
 ## Data Integrity & Pipeline Rules
 
-- **Label truth only**: Allergen and dietary flags are extracted strictly from visible label text. Never inferred or assumed.
-- **Barcode enrichment**: Nutrition (kcal, protein) and ingredients missing from photos are populated by barcode validation (internal DB match first, then Open Food Facts).
+- **Label truth first**: Dietary flags are extracted strictly from visible label text. Allergens are read from labels; gaps are filled by barcode (same-barcode label data, then Open Food Facts). For allergy filters only printed-label allergens count as known — Open Food Facts allergens can exclude but never clear an item. Every allergen display carries the computer-read warning (`ALLERGY_WARNING` in app.py).
+- **Barcode enrichment**: Nutrition (kcal, protein), ingredients and allergens missing from photos are populated by barcode validation (internal DB match first, then Open Food Facts).
 - **Stale records**: Prices and items older than 14 days are excluded from recommendation rankings.
 - **Security & Privacy**: EXIF and GPS data are stripped from every upload before disk persistence. Duplicate images are rejected by image hash.
