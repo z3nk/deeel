@@ -8,7 +8,7 @@ from datetime import date
 import pytest
 
 from models import Deal, Item, Preferences, Shop
-from optimiser import best_lunch_for_shop, get_results, hard_filter, rank_shops, score_lunch
+from optimiser import best_lunch_for_shop, get_results, hard_filter, rank_shops, score_lunch, _deal_price
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ def _item(
         price_gbp=price,
         temperature=temperature,
         diet_flags=diet_flags or [],
-        allergens=allergens or [],
+        allergens=allergens,
         meal_deal_eligible=meal_deal_eligible,
         source_image="test.jpg",
         source_text="test",
@@ -144,10 +144,17 @@ class TestHardFilter:
 
     def test_null_allergens_excluded_when_filter_set(self):
         """Item with unknown allergens must be excluded if user has allergen needs."""
-        item = _item("unknown", "shop-a", "main", 2.00, allergens=[])
+        item = _item("unknown", "shop-a", "main", 2.00, allergens=None)
         prefs = Preferences(allergens_exclude=["nuts"])
         result = hard_filter([item], prefs, today=TODAY)
         assert result == []
+
+    def test_item_without_allergens_kept_when_filter_set(self):
+        """Item with no allergens (e.g. water or fruit) must be kept if it doesn't contain avoided allergen."""
+        item = _item("safe", "shop-a", "snack", 1.00, allergens=[])
+        prefs = Preferences(allergens_exclude=["nuts"])
+        result = hard_filter([item], prefs, today=TODAY)
+        assert len(result) == 1
 
     def test_diet_flag_required(self):
         non_veg = _item("meat", "shop-a", "main", 2.00, diet_flags=[])
@@ -331,3 +338,17 @@ class TestShopImages:
         kosher = _item("k", "shop-a", "main", 2.00, diet_flags=["Kosher"])
         result = hard_filter([plain, kosher], Preferences(diet_flags=["kosher"]), today=TODAY)
         assert [i.item_id for i in result] == ["k"]
+
+
+class TestLoyaltyCards:
+    def test_clubcard_discount_applies_only_when_has_clubcard(self):
+        deal = Deal(deal_id="d1", shop_id="tesco-tcr", name="Meal Deal", price_gbp=4.25, loyalty_price_gbp=3.85, loyalty_scheme="Clubcard", source_image="x.jpg", last_seen=TODAY, status="approved")
+        assert _deal_price(deal, Preferences(has_clubcard=False)) == 4.25
+        assert _deal_price(deal, Preferences(has_clubcard=True)) == 3.85
+        assert _deal_price(deal, Preferences(has_nectar=True)) == 4.25
+
+    def test_nectar_discount_applies_only_when_has_nectar(self):
+        deal = Deal(deal_id="d2", shop_id="sainsburys-warren-st", name="Meal Deal", price_gbp=4.50, loyalty_price_gbp=3.50, loyalty_scheme="Nectar", source_image="x.jpg", last_seen=TODAY, status="approved")
+        assert _deal_price(deal, Preferences(has_nectar=False)) == 4.50
+        assert _deal_price(deal, Preferences(has_nectar=True)) == 3.50
+        assert _deal_price(deal, Preferences(has_clubcard=True)) == 4.50

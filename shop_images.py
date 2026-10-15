@@ -34,6 +34,16 @@ _BADGES = {
 }
 
 
+def brand_colour(chain: str) -> str:
+    """Return the primary brand hex colour for the chain."""
+    return _BADGES.get(chain, ("", "#0F7B5F", "#FFFFFF"))[1]
+
+
+def brand_text_colour(chain: str) -> str:
+    """Return the badge text hex colour for the chain."""
+    return _BADGES.get(chain, ("", "#0F7B5F", "#FFFFFF"))[2]
+
+
 def _find(directory: Path, stem: str) -> Path | None:
     for ext in _IMAGE_EXTS:
         path = directory / f"{stem}{ext}"
@@ -57,9 +67,15 @@ def storefront_path(shop: Shop) -> Path | None:
 def logo_html(shop: Shop, size: int = 28) -> str:
     """Inline <img> or SVG badge for the chain logo, safe to drop into st.markdown HTML."""
     logo = _find(LOGO_DIR, shop.chain)
-    style = f"width:{size}px;height:{size}px;border-radius:6px;vertical-align:middle;margin-right:8px"
+    img_style = (
+        f"width:{size}px;height:{size}px;border-radius:6px;vertical-align:middle;"
+        f"margin-right:8px;object-fit:contain;background:#fff;padding:2px;"
+        f"box-sizing:border-box;border:1px solid rgba(0,0,0,0.1);"
+    )
     if logo is not None:
-        return f'<img src="{_data_uri(logo)}" alt="{shop.name}" style="{style};object-fit:contain;background:#fff">'
+        return f'<img src="{_data_uri(logo)}" alt="{shop.name}" style="{img_style}">'
+
+    style = f"width:{size}px;height:{size}px;border-radius:6px;vertical-align:middle;margin-right:8px"
 
     text, bg, fg = _BADGES.get(shop.chain, (shop.name[:1].upper(), "#94A3B8", "#FFFFFF"))
     font = size * (0.32 if len(text) > 2 else 0.5)

@@ -11,6 +11,7 @@ Screens:
 
 from __future__ import annotations
 
+import html
 import json
 from datetime import date, datetime
 from pathlib import Path
@@ -54,6 +55,7 @@ from optimiser import (
 
 UPLOAD_DIR = UPLOAD_ROOT
 UPLOAD_DIR.mkdir(exist_ok=True)
+# Map popup uses native button to navigate parent
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -118,7 +120,11 @@ def _apply_pending_resets() -> None:
     if st.session_state.pop("_clear_diet_pending", False):
         for d in DIETS:
             st.session_state[f"diet_{d}"] = False
+        st.session_state["allergens_avoid"] = []
+        for c in ("card_clubcard", "card_nectar", "card_lidl_plus", "card_sparks", "card_mywaitrose", "card_club_pret"):
+            st.session_state[c] = True
         st.session_state["meats_allowed"] = []
+        st.session_state["temp_pref"] = "any"
     if st.session_state.pop("_clear_nutrition_pending", False):
         st.session_state["min_protein"] = 0
         st.session_state["max_kcal"] = KCAL_CAP
@@ -130,7 +136,7 @@ def render_sidebar() -> Preferences:
 
     # Username
     st.sidebar.text_input(
-        "Your name (for credits)",
+        "Username",
         key="username",
         placeholder="e.g. Alex",
     )
@@ -141,9 +147,14 @@ def render_sidebar() -> Preferences:
         '<p style="color:#DC2626;font-weight:700;margin-bottom:4px">Allergies — avoid</p>',
         unsafe_allow_html=True,
     )
-    avoid = [a for a in ALLERGENS if st.sidebar.checkbox(a, key=f"avoid_{a}")]
-    if avoid:
-        st.sidebar.caption("Items with unchecked allergen labels are hidden.")
+    avoid = st.sidebar.multiselect(
+        "Allergies — avoid",
+        options=ALLERGENS,
+        default=[],
+        key="allergens_avoid",
+        label_visibility="collapsed",
+        placeholder="Choose allergies to avoid...",
+    )
     st.sidebar.divider()
 
     # Diet
@@ -175,18 +186,30 @@ def render_sidebar() -> Preferences:
     # Preferences
     st.sidebar.markdown("**Preferences**")
     max_price = st.sidebar.slider("Max price (£)", 2.0, 14.0, 6.0, step=0.25)
-    walk_limit = st.sidebar.slider("Walking limit", 2, 30, 10, format="%d min")
-    temp = st.sidebar.radio(
+    if "walk_limit_override" in st.session_state:
+        st.session_state["walk_limit"] = st.session_state.pop("walk_limit_override")
+    st.session_state.setdefault("walk_limit", 10)
+    walk_limit = st.sidebar.slider("Walking limit", 2, 30, format="%d min", key="walk_limit")
+    temp_selected = st.sidebar.segmented_control(
         "Hot or cold main",
         options=["any", "hot", "cold"],
-        horizontal=True,
+        default="any",
+        selection_mode="single",
+        required=True,
+        format_func=str.capitalize,
         key="temp_pref",
     )
+    temp = temp_selected or "any"
     st.sidebar.divider()
 
-    # Loyalty
+    # Loyalty cards
     st.sidebar.markdown("**Loyalty cards**")
-    loyalty = st.sidebar.toggle("I have loyalty cards (Clubcard / Nectar)", value=False)
+    has_clubcard = st.sidebar.checkbox("Tesco Clubcard", value=True, key="card_clubcard")
+    has_nectar = st.sidebar.checkbox("Sainsbury's Nectar", value=True, key="card_nectar")
+    has_lidl_plus = st.sidebar.checkbox("Lidl Plus", value=True, key="card_lidl_plus")
+    has_sparks = st.sidebar.checkbox("M&S Sparks", value=True, key="card_sparks")
+    has_mywaitrose = st.sidebar.checkbox("myWaitrose", value=True, key="card_mywaitrose")
+    has_club_pret = st.sidebar.checkbox("Club Pret", value=True, key="card_club_pret")
     st.sidebar.divider()
 
     # Sort
@@ -207,8 +230,12 @@ def render_sidebar() -> Preferences:
         meats_allowed=[m.lower() for m in meats],
         min_protein_g=float(min_protein) if min_protein else None,
         max_kcal=float(max_kcal) if max_kcal < KCAL_CAP else None,
-        has_clubcard=loyalty,
-        has_nectar=loyalty,
+        has_clubcard=has_clubcard,
+        has_nectar=has_nectar,
+        has_lidl_plus=has_lidl_plus,
+        has_sparks=has_sparks,
+        has_mywaitrose=has_mywaitrose,
+        has_club_pret=has_club_pret,
     )
 
 
@@ -225,7 +252,8 @@ def _freshness_badge(last_seen_str: str) -> str:
         return f'<span style="background:#F1F5F9;color:#94A3B8;font-size:11px;padding:2px 8px;border-radius:999px">● Seen {days}d ago</span>'
     if days > 7:
         return f'<span style="background:#FFFBEB;color:#D97706;font-size:11px;padding:2px 8px;border-radius:999px">● Seen {days}d ago</span>'
-    return f'<span style="background:#F0FDF4;color:#16A34A;font-size:11px;padding:2px 8px;border-radius:999px">● Seen {days}d ago</span>'
+    label = "Seen today" if days <= 0 else f"Seen {days}d ago"
+    return f'<span style="background:#F0FDF4;color:#16A34A;font-size:11px;padding:2px 8px;border-radius:999px">● {label}</span>'
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
@@ -296,30 +324,71 @@ def _deeel_colour(total: int) -> str:
 
 
 def _render_deeel(lunch, prefs: Preferences) -> None:
-    """Deeel score badge + a popover with the weighted breakdown."""
+    """Deeel score badge that reveals the score breakdown popover on hover or click."""
     d = lunch_deeel(lunch, prefs)
-    badge_col, info_col = st.columns([1, 2])
-    with badge_col:
-        st.markdown(
-            f'<span style="background:{_deeel_colour(d.total)};color:#fff;font-weight:700;'
-            f'font-size:13px;padding:3px 10px;border-radius:999px">Deeel {d.total}</span>',
-            unsafe_allow_html=True,
+    colour = _deeel_colour(d.total)
+
+    factors_html = []
+    for k, weight in DEEEL_WEIGHTS.items():
+        pct = max(0.0, min(100.0, d.parts[k] * 100))
+        part_colour = _deeel_colour(round(pct))
+        factors_html.append(
+            f'<div style="margin-bottom:8px;">'
+            f'<div style="font-size:12px;margin-bottom:3px;">'
+            f'<b>{html.escape(DEEEL_LABELS[k])}</b>'
+            f'</div>'
+            f'<div style="background:rgba(128,128,128,0.2);border-radius:999px;height:7px;overflow:hidden;">'
+            f'<div style="background:{part_colour};width:{pct:.1f}%;height:100%;border-radius:999px;"></div>'
+            f'</div>'
+            f'</div>'
         )
-    with info_col.popover("How it's scored"):
-        for k, weight in DEEEL_WEIGHTS.items():
-            pts = weight * d.parts[k]
-            st.progress(d.parts[k], text=f"{DEEEL_LABELS[k]}: {pts:.0f} / {weight}")
-        st.caption("**Ingredient quality**: fewer processing markers (additive types like emulsifiers, "
-                   "preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. "
-                   "The main counts double.")
-        for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
-            a = assess_ingredients(item.ingredients_text)
-            via = f" · ingredients from {item.external_fields['ingredients_text']}" \
-                if "ingredients_text" in item.external_fields else ""
-            st.caption(f"{label} · {item.name}: {a.score * 100:.0f}/100 — {a.reason()}{via}")
-        if d.partial:
-            st.caption("Some label info is missing. Unknown nutrition scores half marks; "
-                       "unknown ingredients score below an average label.")
+    factors_rendered = "\n".join(factors_html)
+
+    items_html = []
+    for label, item in (("Main", lunch.main), ("Snack", lunch.snack), ("Drink", lunch.drink)):
+        a = assess_ingredients(item.ingredients_text)
+        via = f" · ingredients from {item.external_fields['ingredients_text']}" \
+            if "ingredients_text" in item.external_fields else ""
+        items_html.append(
+            f'<div style="font-size:11px;margin-top:4px;line-height:1.4;">'
+            f'<b>{html.escape(label)}</b> · {html.escape(item.name)}: '
+            f'<b>{a.score * 100:.0f}/100</b> — {html.escape(a.reason() + via)}'
+            f'</div>'
+        )
+    items_rendered = "\n".join(items_html)
+
+    partial_note = ""
+    if d.partial:
+        partial_note = (
+            '<div style="font-size:11px;opacity:0.75;margin-top:8px;font-style:italic;line-height:1.35;">'
+            'Some label info is missing. Unknown nutrition scores half marks; unknown ingredients score below an average label.'
+            '</div>'
+        )
+
+    badge_html = (
+        f'<div class="deeel-popover-wrapper">'
+        f'<details>'
+        f'<summary>'
+        f'<span style="background:{colour};color:#fff;font-weight:700;font-size:13px;padding:3px 12px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;box-shadow:0 1px 2px rgba(0,0,0,0.15);" title="Hover or click to view Deeel score breakdown">'
+        f'Deeel score {d.total} <span style="font-size:9px;opacity:0.85;">▼</span>'
+        f'</span>'
+        f'</summary>'
+        f'<div class="deeel-dropdown-menu">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(128,128,128,0.2);">'
+        f'<span style="font-size:13px;font-weight:700;">Deeel score breakdown</span>'
+        f'<span style="background:{colour};color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:999px;">{d.total} / 100</span>'
+        f'</div>'
+        f'{factors_rendered}'
+        f'<div style="font-size:11px;opacity:0.85;margin-top:10px;padding-top:8px;border-top:1px solid rgba(128,128,128,0.15);line-height:1.35;">'
+        f'<b>Ingredient quality</b>: fewer processing markers (additives like emulsifiers, preservatives, sweeteners, flavourings) and shorter ingredient lists score higher. The main counts double.'
+        f'</div>'
+        f'{items_rendered}'
+        f'{partial_note}'
+        f'</div>'
+        f'</details>'
+        f'</div>'
+    )
+    st.html(badge_html)
 
 
 def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):
@@ -402,8 +471,24 @@ def screen_find(prefs: Preferences):
                     st.session_state["walk_limit_override"] = 15
                     st.rerun()
             elif not any(i.category == "main" for i in filtered):
-                st.warning("No mains match your filters.")
-                if st.button("Clear diet filters", key="relax_diet"):
+                has_diet = any(prefs.diet_flags) or bool(prefs.meats_allowed)
+                has_allergy = bool(prefs.allergens_exclude)
+                if has_diet and has_allergy:
+                    msg = "No mains match your diet and allergy filters."
+                    btn_text = "Clear diet & allergy filters"
+                elif has_allergy:
+                    msg = "No mains match your allergy filters."
+                    btn_text = "Clear allergy filters"
+                else:
+                    msg = "No mains match your diet filters."
+                    btn_text = "Clear diet filters"
+                st.warning(msg)
+                if st.button(btn_text, key="relax_diet"):
+                    st.session_state["_clear_diet_pending"] = True
+                    st.rerun()
+            elif not any(i.category == "snack" for i in filtered) or not any(i.category == "drink" for i in filtered):
+                st.warning("No snacks or drinks match your allergy filters.")
+                if st.button("Clear allergy filters", key="relax_snack_drink"):
                     st.session_state["_clear_diet_pending"] = True
                     st.rerun()
             elif prefs.min_protein_g is not None or prefs.max_kcal is not None:
@@ -412,8 +497,11 @@ def screen_find(prefs: Preferences):
                     st.session_state["_clear_nutrition_pending"] = True
                     st.rerun()
             else:
-                st.info("Set your preferences on the left to find the best lunch near you.")
-                st.caption("Pick a budget and walking limit — results appear instantly.")
+                st.warning("No meal combinations match your budget or preferences.")
+                if st.button("Clear all filters", key="relax_all"):
+                    st.session_state["_clear_diet_pending"] = True
+                    st.session_state["_clear_nutrition_pending"] = True
+                    st.rerun()
             return
 
         in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
@@ -463,12 +551,80 @@ def screen_find(prefs: Preferences):
 
     with map_tab:
         all_ranked = [primary] + alternatives + other_shops if primary else []
+        for l in all_ranked:
+            st.session_state[f"why_{l.shop.shop_id}"] = l.why or ""
         fmap = build_map(
             ranked_lunches=all_ranked,
             all_shops=shops,
             walking_limit_minutes=prefs.max_walking_minutes,
         )
-        st_folium(fmap, width=900, height=500, returned_objects=[])
+        map_data = st_folium(
+            fmap,
+            width=900,
+            height=500,
+            returned_objects=["last_object_clicked", "last_object_clicked_tooltip"],
+        )
+
+        # Detect clicked shop on map
+        selected_shop_id = st.session_state.get("map_selected_shop_id")
+        if map_data:
+            clicked_obj = map_data.get("last_object_clicked")
+            clicked_tooltip = map_data.get("last_object_clicked_tooltip") or ""
+            if clicked_obj and isinstance(clicked_obj, dict):
+                clat = clicked_obj.get("lat")
+                clng = clicked_obj.get("lng")
+                if clat is not None and clng is not None:
+                    match = next(
+                        (s for s in shops if abs(s.lat - clat) < 0.0003 and abs(s.lng - clng) < 0.0003),
+                        None,
+                    )
+                    if match:
+                        selected_shop_id = match.shop_id
+                        st.session_state["map_selected_shop_id"] = match.shop_id
+            if not selected_shop_id and clicked_tooltip:
+                match = next((s for s in shops if s.name in clicked_tooltip), None)
+                if match:
+                    selected_shop_id = match.shop_id
+                    st.session_state["map_selected_shop_id"] = match.shop_id
+
+        # Fallback to primary shop if nothing selected yet
+        if not selected_shop_id and primary:
+            selected_shop_id = primary.shop.shop_id
+            st.session_state["map_selected_shop_id"] = selected_shop_id
+
+        if selected_shop_id:
+            sel_shop = next((s for s in shops if s.shop_id == selected_shop_id), None)
+            sel_lunch = next((l for l in all_ranked if l.shop.shop_id == selected_shop_id), None)
+            if sel_shop:
+                st.markdown("---")
+                with st.container(border=True):
+                    mcol1, mcol2, mcol3 = st.columns([3, 2, 1])
+                    with mcol1:
+                        rank_prefix = ""
+                        if sel_lunch:
+                            sel_rank = next((i + 1 for i, l in enumerate(all_ranked) if l.shop.shop_id == selected_shop_id), 0)
+                            rank_prefix = f"#{sel_rank} " if sel_rank > 0 else ""
+                        st.markdown(
+                            f"{logo_html(sel_shop)}<b>{rank_prefix}{sel_shop.name}</b>",
+                            unsafe_allow_html=True,
+                        )
+                        st.caption(f"{sel_shop.walking_minutes:.0f} min walk")
+                        if sel_lunch:
+                            st.markdown(f"{sel_lunch.main.name} + {sel_lunch.snack.name} + {sel_lunch.drink.name}")
+                        else:
+                            st.caption("Outside your active filters")
+                    with mcol2:
+                        if sel_lunch:
+                            st.markdown(f"### £{sel_lunch.price_gbp:.2f}")
+                            deal_str = "Meal deal" if sel_lunch.used_deal else "Bought separately"
+                            st.caption(f"✅ {deal_str}")
+                    with mcol3:
+                        if st.button("See basket →", key=f"map_see_basket_{sel_shop.shop_id}"):
+                            st.session_state["detail_shop_id"] = sel_shop.shop_id
+                            if sel_lunch:
+                                st.session_state[f"why_{sel_shop.shop_id}"] = sel_lunch.why or ""
+                            st.session_state["screen"] = "detail"
+                            st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -876,12 +1032,12 @@ def screen_upload():
     st.info(
         "Pick the shop and what's in the photo, then upload one or many photos. "
         "One photo can cover a whole shelf — we'll pick out every product. "
-        "Credits are paid once our team approves each product."
+        "Credits are paid once your photo is approved."
     )
 
     user_id = _ensure_user()
     if not user_id:
-        st.warning("Enter your name in the sidebar to earn credits.")
+        st.warning("Enter your username in the sidebar to earn credits.")
 
     conn = _conn()
     shops_list = _load_data()[0]
@@ -1027,7 +1183,7 @@ def screen_credits():
     st.markdown("## My credits")
     user_id = _ensure_user()
     if not user_id:
-        st.info("Enter your name in the sidebar to see your credits.")
+        st.info("Enter your username in the sidebar to see your credits.")
         return
 
     conn = _conn()
@@ -1259,7 +1415,79 @@ SCREENS = {
 ADMIN_SCREENS = {"Review queue": "review"}
 
 
+def _inject_global_styles() -> None:
+    """Inject global CSS overrides across the app."""
+    st.html(
+        """<style>
+        /* Remove hover anchor/link copy buttons from all headings and subheadings */
+        [data-testid="stHeaderActionElements"],
+        .stHeadingWithActionElements a,
+        .stHeadingWithActionElements button,
+        a[aria-label="Link to heading"],
+        a.anchorjs-link {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            opacity: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Deeel score badge popover */
+        .deeel-popover-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 4px 0 6px 0;
+        }
+        .deeel-popover-wrapper details {
+            display: inline-block;
+            position: relative;
+        }
+        .deeel-popover-wrapper summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+            outline: none;
+        }
+        .deeel-popover-wrapper summary::-webkit-details-marker,
+        .deeel-popover-wrapper summary::marker {
+            display: none;
+        }
+        .deeel-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 99999;
+            width: 320px;
+            background: var(--background-color, #ffffff);
+            color: var(--text-color, #1e293b);
+            border: 1px solid rgba(128, 128, 128, 0.25);
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+            text-align: left;
+        }
+        .deeel-popover-wrapper details[open] > .deeel-dropdown-menu,
+        .deeel-popover-wrapper details:hover > .deeel-dropdown-menu {
+            display: block !important;
+        }
+        </style>"""
+    )
+
+
 def main():
+    _inject_global_styles()
+
+    # Direct navigation from URL query param (e.g. from map popup "See basket →" link)
+    shop_param = st.query_params.get("shop")
+    if shop_param:
+        del st.query_params["shop"]
+        st.session_state["detail_shop_id"] = shop_param
+        st.session_state["screen"] = "detail"
+
     prefs = render_sidebar()
     render_admin_sidebar()
 

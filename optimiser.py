@@ -43,7 +43,7 @@ WALK_SPEED_MPM = 80.0    # metres per minute (used to convert mins → metres in
 def _row_to_item(row: sqlite3.Row) -> Item:
     d = dict(row)
     d["diet_flags"] = json.loads(d["diet_flags"])
-    d["allergens"] = json.loads(d["allergens"])
+    d["allergens"] = None if d.get("allergens") is None or d["allergens"] == "null" else json.loads(d["allergens"])
     d["meats"] = None if d.get("meats") is None else json.loads(d["meats"])
     d["external_fields"] = json.loads(d.get("external_fields") or "{}")
     d["meal_deal_eligible"] = (
@@ -110,7 +110,7 @@ def hard_filter(items: list[Item], prefs: Preferences, today: date | None = None
 
         # 3. Allergens — null allergens = unsafe when user has allergen needs
         if prefs.allergens_exclude:
-            if not item.allergens:  # allergens unknown → exclude
+            if item.allergens is None:  # allergens unknown → exclude
                 continue
             item_allergens_lower = [a.lower() for a in item.allergens]
             if any(excl.lower() in item_allergens_lower for excl in prefs.allergens_exclude):
@@ -234,10 +234,25 @@ def _quality_score(item: Item) -> float:
     return q
 
 
+def _item_qualifies_for_loyalty(item: Item, prefs: Preferences) -> bool:
+    shop = (item.shop_id or "").lower()
+    if "tesco" in shop:
+        return prefs.has_clubcard
+    if "sainsburys" in shop:
+        return prefs.has_nectar
+    if "lidl" in shop:
+        return prefs.has_lidl_plus
+    if "ms" in shop or "marks" in shop:
+        return prefs.has_sparks
+    if "waitrose" in shop:
+        return prefs.has_mywaitrose
+    if "pret" in shop:
+        return prefs.has_club_pret
+    return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
+
+
 def _effective_price(item: Item, prefs: Preferences) -> float:
-    if prefs.has_clubcard and item.loyalty_price_gbp is not None:
-        return item.loyalty_price_gbp
-    if prefs.has_nectar and item.loyalty_price_gbp is not None:
+    if item.loyalty_price_gbp is not None and _item_qualifies_for_loyalty(item, prefs):
         return item.loyalty_price_gbp
     return item.price_gbp
 
@@ -267,8 +282,26 @@ def score_lunch(
 DEEEL_SHORTLIST = 4   # per category, per criterion (cheapest / best ingredients / most protein)
 
 
+def _deal_qualifies_for_loyalty(deal: Deal, prefs: Preferences) -> bool:
+    scheme = (deal.loyalty_scheme or "").lower()
+    shop = (deal.shop_id or "").lower()
+    if "clubcard" in scheme or "tesco" in shop:
+        return prefs.has_clubcard
+    if "nectar" in scheme or "sainsburys" in shop:
+        return prefs.has_nectar
+    if "lidl" in scheme or "lidl" in shop:
+        return prefs.has_lidl_plus
+    if "sparks" in scheme or "ms" in shop or "marks" in shop:
+        return prefs.has_sparks
+    if "waitrose" in scheme or "waitrose" in shop:
+        return prefs.has_mywaitrose
+    if "pret" in scheme or "pret" in shop:
+        return prefs.has_club_pret
+    return bool(prefs.has_clubcard or prefs.has_nectar or prefs.has_lidl_plus or prefs.has_sparks or prefs.has_mywaitrose or prefs.has_club_pret)
+
+
 def _deal_price(deal: Deal, prefs: Preferences) -> float:
-    if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp:
+    if deal.loyalty_price_gbp and _deal_qualifies_for_loyalty(deal, prefs):
         return deal.loyalty_price_gbp
     return deal.price_gbp
 
@@ -400,11 +433,7 @@ def best_lunch_for_shop(
     shop_deals = [d for d in deals if d.shop_id == shop.shop_id]
     if shop_deals:
         deal = shop_deals[0]  # use the first (best) deal; could rank if multiple
-        deal_price = (
-            deal.loyalty_price_gbp
-            if (prefs.has_clubcard or prefs.has_nectar) and deal.loyalty_price_gbp
-            else deal.price_gbp
-        )
+        deal_price = _deal_price(deal, prefs)
 
         deal_mains  = [i for i in mains  if i.meal_deal_eligible]
         deal_snacks = [i for i in snacks if i.meal_deal_eligible]
@@ -527,7 +556,7 @@ def top_lunches_for_shop(
 
         if shop_deals and main.meal_deal_eligible and best_snack.meal_deal_eligible and best_drink.meal_deal_eligible:
             d = shop_deals[0]
-            dp = d.loyalty_price_gbp if (prefs.has_clubcard or prefs.has_nectar) and d.loyalty_price_gbp else d.price_gbp
+            dp = _deal_price(d, prefs)
             if dp < sep_price and dp <= p_max:
                 price, used_deal, deal_obj = dp, True, d
 
