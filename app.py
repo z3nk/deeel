@@ -33,6 +33,7 @@ from db import (
     upsert_user,
 )
 from extract import extract_item, extract_deal, strip_exif
+from demo import screen_demo
 from map_view import build_map
 from shop_images import logo_html, storefront_path
 from models import Preferences
@@ -250,7 +251,7 @@ def _item_nutrition(item) -> str:
     return " · ".join(parts) or "nutrition not on label"
 
 
-def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False):
+def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = False, key_prefix: str = ""):
     from models import Lunch
 
     with st.container(border=True):
@@ -301,7 +302,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
             ), unsafe_allow_html=True)
 
         with col3:
-            if st.button("See basket →", key=f"open_{lunch.shop.shop_id}_{rank}"):
+            if st.button("See basket →", key=f"{key_prefix}open_{lunch.shop.shop_id}_{rank}"):
                 st.session_state["detail_shop_id"] = lunch.shop.shop_id
                 st.session_state[f"why_{lunch.shop.shop_id}"] = lunch.why or ""
                 st.session_state["screen"] = "detail"
@@ -974,13 +975,18 @@ def main():
     if "screen" not in st.session_state:
         st.session_state["screen"] = "find"
 
-    # Top nav
-    nav_cols = st.columns(len(SCREENS))
+    # Top nav, with the "?" tour button as a narrow last column (top-right corner)
+    nav_cols = st.columns([1] * len(SCREENS) + [0.25])
     for col, (label, key) in zip(nav_cols, SCREENS.items()):
         with col:
             if st.button(label, use_container_width=True):
                 st.session_state["screen"] = key
                 st.rerun()
+    with nav_cols[-1]:
+        if st.button("?", key="open_demo", help="Take a live tour of the site", use_container_width=True):
+            st.session_state["demo_step"] = 0
+            st.session_state["screen"] = "demo"
+            st.rerun()
 
     st.divider()
 
@@ -996,6 +1002,8 @@ def main():
         screen_credits()
     elif screen == "review":
         screen_review()
+    elif screen == "demo":
+        screen_demo(_load_data, render_result_card)
 
 
 if __name__ == "__main__":
