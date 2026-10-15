@@ -78,8 +78,9 @@ Every lunch combo receives an objective **Deeel score** out of 100 based entirel
 
 ## Food Safety & Trust
 
-- **Strict Label-Only Data**: Diet flags and allergen warnings are taken strictly from printed packaging labels — never guessed or assumed by AI.
-- **Safety First**: If allergen information for an item is missing or unverified, that item is automatically excluded when that allergen filter is enabled.
+- **Label First**: Diet flags come strictly from printed packaging labels. Allergens are read from labels too; where a photo didn't show them, they're filled by barcode from another photo of the same product or from [Open Food Facts](https://world.openfoodfacts.org) — and the app always says where they came from.
+- **Check the Pack**: All allergen information is read by computer and may be wrong or incomplete. The app shows this warning next to every allergen it displays — always check the packaging yourself.
+- **Safety First**: If allergen information for an item is missing or unverified, that item is automatically excluded when that allergen filter is enabled. Allergens from Open Food Facts can exclude an item but never clear one — only allergens read from a printed label can.
 - **Freshness Window**: Prices and items carry a `last_seen` timestamp. Any product older than 14 days is automatically retired from active rankings.
 - **Privacy Protected**: Uploaded photos are stripped of all EXIF and GPS location metadata before being processed.
 
