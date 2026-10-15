@@ -22,11 +22,11 @@ This brief replaces the visual parts of `UI_BRIEF.md` (v3). Functional behaviour
 
 ---
 
-## 3. Brand direction — decision for Neeam
+## 3. Brand direction — **chosen: B, "Snack hype"**
 
-Pick one. Each needs to carry both a utility app and loud campus marketing.
+Neeam chose **B**. A and C are kept below for reference. The brand has to carry both a utility app and loud campus marketing.
 
-| | A. **"Shelf-smart"** (recommended) | B. **"Snack hype"** | C. **"Student co-op"** |
+| | A. "Shelf-smart" | B. **"Snack hype" (chosen)** | C. "Student co-op" |
 |---|---|---|---|
 | Personality | Clever mate who's done the maths | Loud, meme-y, sticker energy | Earnest, community-run, transparent |
 | Colour feel | Keep the deep green `#0F7B5F` as anchor + one punchy accent (e.g. receipt-yellow) on warm off-white | Saturated multi-colour, high contrast | Muted greens and kraft-paper neutrals |
@@ -34,12 +34,12 @@ Pick one. Each needs to carry both a utility app and loud campus marketing.
 | Visual device | **Triple-E** as a price-tag/receipt motif; shelf-edge-label shapes | Stickers, emoji, bold outlines | Hand-drawn map pins, photo collage of real shelves |
 | Risk | Can drift corporate if the accent is timid | Undermines trust in allergy info | Low stand-out on posters |
 
-**Why A:** the product's core promises are *money* and *safety* — the voice has to be trustworthy enough for allergen info and the Deeel score, but still fun enough for an Instagram story. Shelf-edge labels and receipts are what users literally see in the shop, so they're a natural, ownable visual language.
+**Going with B — and handling its risk:** loud, saturated, sticker-and-meme energy for the brand, marketing and the fun parts of the app (results, Deeel score, savings, credits). Because B's risk is undermining trust in allergy info, **safety surfaces opt out of the hype**: allergy chips, allergy warnings, sample-data labels and the Open Food Facts attribution use a calm, plain, high-contrast style (no stickers, emoji jokes or playful type) so they read as serious. Design both modes explicitly: "hype" and "serious".
 
 ### Brand basics to define
 
 - **Wordmark / logo:** explore (1) wordmark with the three Es treated as a unit (stacked like price-tag lines, or as a "≡"-style triple bar), (2) a price-tag or shelf-edge-label icon containing "eee", (3) a sandwich/receipt monogram "D". Need: full wordmark, compact mark (works at 32 px as app/favicon), one-colour version, version on the primary green.
-- **Colour:** keep `#0F7B5F` as primary unless the chosen direction strongly argues otherwise (it's already in the shipped theme). Propose one accent, warm neutrals, and the full semantic set (§5).
+- **Colour:** direction B calls for a saturated, high-contrast multi-colour palette. `#0F7B5F` (shipped theme) can stay as one of the colours or be replaced — Neeam to confirm. The semantic set (§5) — especially danger/allergen red — must stay distinct from the brand colours so warnings never look like decoration.
 - **Typography:** one display face (headlines, marketing, score numerals) + one UI face (must render well in Streamlit via Google Fonts or the system stack). Tabular numerals required for prices.
 - **Iconography:** simple line icons; needs: walk (minutes), hot/cold, meal deal, card/loyalty, camera/upload, credits, map pin, allergen warning, barcode, sample data, "?".
 - **Imagery:** real shelf photography (shot by us — see `uploads/`) over stock food photos; illustration only as accents. No photos of people's faces.
@@ -47,7 +47,7 @@ Pick one. Each needs to carry both a utility app and loud campus marketing.
 
 ### Voice and microcopy
 
-Short, direct, numbers-first, a bit of wit — never jokey about allergies.
+Loud, playful, meme-literate, numbers-first (direction B) — but never jokey about allergies, health or prices being guaranteed.
 
 | Situation | Write | Not |
 |---|---|---|
@@ -198,8 +198,8 @@ Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos
 
 ## 11. Open questions for Neeam
 
-1. Brand direction: A (recommended), B or C?
-2. Keep `#0F7B5F` as the primary, or allow the new brand to change it?
+1. ~~Brand direction~~ — decided: **B, "Snack hype"** (with safety surfaces kept serious).
+2. Keep `#0F7B5F` as one of the brand colours, or let the B palette replace it?
 3. Is the triple-E device the hero of the logo, or should the logo lead with food (sandwich/receipt)?
 4. Mobile-first now — OK to redesign how filters work on phones (moving away from the sidebar)?
 5. Should rewards/sponsor slots appear in marketing at all while sponsors are placeholders?
