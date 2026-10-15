@@ -33,6 +33,11 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 - `meal_deal.db` is gitignored and Streamlit Cloud's disk is ephemeral. Approved real data reaches the live app via `seed/approved.json` (`snapshot.py`): export with `python seed/load_seed.py --export` or the Review queue button, commit, push. Every instance syncs it on startup.
 - Placeholder (fallback) rows are kept only for shops with no approved real data.
 
+## Design system
+- design/tokens.json is the only source of colours, type and spacing; never hard-code them.
+- In Streamlit HTML use the `.dl-*` classes (design/components.css) or `var(--token)`; `theme.inject_theme()` runs once at the top of app.py.
+- Where page CSS can't reach (the Folium map iframe, standalone badges) use `theme.token(name)` / `theme.type_css(name)`.
+
 ## Map
 - A map view tab sits alongside the list view tab on Screen 1.
 - Uses `streamlit-folium` + `folium` with OpenStreetMap tiles. No API key needed.

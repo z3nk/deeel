@@ -74,6 +74,41 @@ def page_css() -> str:
     return "\n".join(imports) + "\n" + tokens_css() + rest
 
 
+@lru_cache(maxsize=1)
+def _tokens() -> dict:
+    return json.loads(TOKENS_PATH.read_text())
+
+
+def token(name: str) -> str:
+    """
+    A colour/spacing/radius token's resolved value, e.g. token("rank-1") → "#16a34a".
+    For places CSS variables can't reach: the Folium map (its own iframe) and the
+    standalone shop badge used in map popups. Aliases like "{text}" are followed.
+    """
+    t = _tokens()
+    pool = t["color"]["tokens"] + [x for f in ("spacing", "radius", "shadow", "borderWidth")
+                                   for x in t.get(f, {}).get("tokens", [])]
+    by_name = {x["name"]: x["value"] for x in pool}
+    value = by_name[name]
+    if isinstance(value, dict):
+        value = value.get("light") or next(iter(value.values()))
+    match = _ALIAS.match(str(value))
+    return token(match.group(1)) if match else str(value)
+
+
+def type_css(name: str) -> str:
+    """A type style as inline CSS (resolved font stack), for the same iframe cases as token()."""
+    t = _tokens()
+    for group in t["type"]["groups"]:
+        for style in group["styles"]:
+            if style["name"] == name:
+                # single quotes: this goes inside style="..." attributes
+                family = t["type"]["families"][style.get("family", group["family"])].replace('"', "'")
+                return (f"font-family:{family};font-size:{style['fontSize']};"
+                        f"line-height:{style['lineHeight']};font-weight:{style['fontWeight']}")
+    raise KeyError(name)
+
+
 def inject_theme() -> None:
     """Inject the design system CSS into the current Streamlit page."""
     import streamlit as st
