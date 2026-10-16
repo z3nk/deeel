@@ -63,6 +63,10 @@ from optimiser import (
 UPLOAD_DIR = UPLOAD_ROOT
 UPLOAD_DIR.mkdir(exist_ok=True)
 # Map popup uses native button to navigate parent
+APP_ROOT = Path(__file__).resolve().parent
+BRANDKIT_DIR = APP_ROOT / "design" / "brandkit"
+APP_LOGO_ICON = BRANDKIT_DIR / "logo-icon.svg"
+APP_LOGO_FULL = BRANDKIT_DIR / "logo-full.svg"
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -70,7 +74,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 st.set_page_config(
     page_title="Deeelicious",
-    page_icon="🥪",
+    page_icon=str(APP_LOGO_ICON) if APP_LOGO_ICON.exists() else "🥪",
     layout="wide",
     initial_sidebar_state="auto",   # expanded on desktop, collapsed on phones
 )
@@ -204,7 +208,10 @@ def _apply_pending_resets() -> None:
 
 def render_sidebar() -> Preferences:
     _apply_pending_resets()
-    st.sidebar.title("🥪 Deeelicious")
+    if APP_LOGO_FULL.exists():
+        st.sidebar.image(str(APP_LOGO_FULL), use_container_width=True)
+    else:
+        st.sidebar.title("Deeelicious")
 
     # Username
     st.sidebar.text_input(
