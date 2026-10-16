@@ -1,6 +1,7 @@
 """Tests for snapshot.py — exporting approved data and loading it on another instance."""
 
 import json
+from pathlib import Path
 from datetime import date
 
 import pytest
@@ -71,4 +72,7 @@ def test_resync_only_on_change_and_drops_removed_rows(tmp_path, monkeypatch):
 def test_no_snapshot_file_is_fine(tmp_path, monkeypatch):
     conn = _fresh(tmp_path, "c.db", monkeypatch)
     assert sync_snapshot(conn, tmp_path / "missing.json") is False
-    assert conn.execute("SELECT COUNT(*) FROM items").fetchone()[0] == 26   # placeholders loaded
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("load_seed", Path(__file__).parent.parent / "seed" / "load_seed.py")
+    seed = importlib.util.module_from_spec(spec); spec.loader.exec_module(seed)
+    assert conn.execute("SELECT COUNT(*) FROM items").fetchone()[0] == len(seed.FALLBACK_ITEMS)   # placeholders loaded

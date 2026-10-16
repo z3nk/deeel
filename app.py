@@ -74,11 +74,20 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Page config
 # ---------------------------------------------------------------------------
 
+def _initial_sidebar_state() -> str:
+    """Filters open by default on a laptop; collapsed on a phone (an open sidebar would cover the results)."""
+    try:
+        agent = st.context.headers.get("User-Agent", "")
+    except Exception:
+        agent = ""
+    return "collapsed" if re.search(r"Mobi|Android|iPhone|iPad", agent) else "expanded"
+
+
 st.set_page_config(
     page_title="Deeelicious",
     page_icon=str(BRAND_DIR / "logo-icon-192.png"),
     layout="wide",
-    initial_sidebar_state="auto",   # expanded on desktop, collapsed on phones
+    initial_sidebar_state=_initial_sidebar_state(),   # expanded on desktop, collapsed on phones
 )
 inject_theme()   # design system: fonts, :root tokens, .dl-* classes (design/tokens.json)
 

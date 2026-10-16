@@ -592,3 +592,16 @@ iframe { border-radius: 12px; }
 [data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) { background: var(--primary-tint); border: var(--border-width-hairline) solid var(--border); border-radius: 12px; }
 [data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) p { color: var(--text); }
 [data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) [data-testid="stAlertContainer"] { background: transparent; }
+
+/* ---------- Shop page: catalogue rows (one divider per row, even padding) ---------- */
+[class*="dl_shelf_row"] { border-bottom: var(--border-width-hairline) solid var(--border); padding: var(--space-3) 0; }
+[class*="dl_shelf_row"] [data-testid="stHorizontalBlock"] { border-bottom: 0 !important; padding: 0 !important; margin: 0 !important; align-items: center !important; }
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"] {
+  flex-direction: row !important; align-items: center !important; justify-content: flex-end !important; gap: var(--space-3) !important; }
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stElementContainer"] { margin: 0 !important; width: auto !important; }
+[class*="dl_shelf_row"] [data-testid="stMarkdownContainer"] p, [class*="dl_shelf_row"] [data-testid="stCaptionContainer"] p { margin: 0 !important; }
+[class*="dl_shelf_row"] .dl-item { margin-top: 0; }
+.dl-type-h2[role="heading"] { margin-top: var(--space-6) !important; }
+/* Streamlit gives every markdown block a -16px bottom margin to cancel its paragraph spacing; raw-HTML blocks
+   have no paragraph, so the row measured 16px short and its divider cut through the text */
+[class*="dl_shelf_row"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
