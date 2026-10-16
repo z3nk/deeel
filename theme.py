@@ -38,7 +38,7 @@ def _value(raw) -> str:
 @lru_cache(maxsize=1)
 def tokens_css() -> str:
     """CSS custom properties for every token, plus a class per type style."""
-    tokens = json.loads(TOKENS_PATH.read_text())
+    tokens = json.loads(TOKENS_PATH.read_text(encoding="utf-8"))
     lines = [":root {"]
     for tok in tokens["color"]["tokens"]:
         lines.append(f"  --{tok['name']}: {_value(tok['value'])};")
@@ -117,5 +117,5 @@ def inject_theme() -> None:
 
 
 if __name__ == "__main__":
-    TOKENS_CSS_PATH.write_text("/* Deeelicious — generated from tokens.json by theme.py */\n" + tokens_css())
+    TOKENS_CSS_PATH.write_text("/* Deeelicious — generated from tokens.json by theme.py */\n" + tokens_css(), encoding="utf-8")
     print(f"wrote {TOKENS_CSS_PATH}")

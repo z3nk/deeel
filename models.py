@@ -209,5 +209,7 @@ class Preferences(BaseModel):
     has_sparks: bool = False
     has_mywaitrose: bool = False
     has_club_pret: bool = False
+    # Hours filter
+    open_now_only: bool = False
 
     model_config = {"frozen": True}

@@ -13,6 +13,7 @@ build_map() returns a folium.Map ready to pass to st_folium().
 from __future__ import annotations
 
 import os
+from datetime import datetime
 import folium
 import streamlit as st
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ from models import Lunch, Shop
 from optimiser import WALK_SPEED_MPM, is_sample
 from theme import token, type_css
 from shop_images import logo_html, logo_data_uri, _BADGES
+from hours import is_shop_open, get_formatted_hours
 
 load_dotenv()
 
@@ -153,6 +155,8 @@ def build_map(
     walking_limit_minutes: float = 10.0,
     campus_lat: float = CAMPUS_LAT,
     campus_lng: float = CAMPUS_LNG,
+    open_now_only: bool = False,
+    now: datetime | None = None,
 ) -> folium.Map:
     """
     Build and return a Folium map for the Map view tab.
@@ -162,7 +166,13 @@ def build_map(
     ranked_lunches  : ordered list of Lunch objects (primary first)
     all_shops       : full shop list (to show grey markers for filtered shops)
     walking_limit_minutes : current sidebar walking-limit value
+    open_now_only   : if True, exclude closed supermarkets from map markers
+    now             : datetime for hours evaluation (defaults to local now)
     """
+    if open_now_only:
+        all_shops = [s for s in all_shops if is_shop_open(s.shop_id, now)]
+        ranked_lunches = [l for l in ranked_lunches if is_shop_open(l.shop.shop_id, now)]
+
     m = folium.Map(
         location=[campus_lat, campus_lng],
         zoom_start=15,
@@ -185,6 +195,8 @@ def build_map(
     t_primary = token("primary")
     t_on_primary = token("on-primary")
     t_primary_tint = token("primary-tint")
+    t_success_tint = token("success-tint")
+    t_success_ink = token("success-ink")
     t_sample = token("sample")
     t_sample_tint = token("sample-tint")
     t_sample_outline = token("sample-outline")
@@ -285,6 +297,25 @@ def build_map(
 
         logo = logo_html(shop, size=22, standalone=True)
 
+        is_open = is_shop_open(shop.shop_id, now)
+        status_label = "Open Now" if is_open else "Closed"
+        status_bg = t_success_tint if is_open else t_sample_tint
+        status_ink = t_success_ink if is_open else t_text_muted
+        status_border = f"border:{t_hairline} solid {t_border};" if not is_open else ""
+        status_badge_html = (
+            f'<span style="display:inline-flex;align-items:center;padding:2px {t_space_2};'
+            f'border-radius:{t_radius_chip};background:{status_bg};color:{status_ink};{status_border}'
+            f'{css_caption};font-weight:600;">{status_label}</span>'
+        )
+        hours_str = get_formatted_hours(shop.shop_id, now)
+        hours_span = f'<span>🕒 {hours_str}</span>' if hours_str else ''
+        hours_row_html = (
+            f'<div style="{css_small};color:{t_text_muted};margin-bottom:{t_space_2};'
+            f'display:flex;align-items:center;gap:{t_space_2};flex-wrap:wrap;">'
+            f'{hours_span}{status_badge_html}'
+            f'</div>'
+        )
+
         if shop.shop_id in ranked_index:
             rank, lunch = ranked_index[shop.shop_id]
             rank_bg = _rank_colour(rank)
@@ -334,7 +365,7 @@ def build_map(
 
             popup_html = (
                 f'<div style="font-family:Figtree,system-ui,sans-serif;">'
-                f'{header_html}{walk_html}{basket_html}{price_row_html}{view_btn_html}'
+                f'{header_html}{walk_html}{hours_row_html}{basket_html}{price_row_html}{view_btn_html}'
                 f'</div>'
             )
             marker_tooltip = f"#{rank} {shop.name}" + (" (sample data)" if is_sample(lunch) else "")
@@ -355,7 +386,7 @@ def build_map(
             )
             popup_html = (
                 f'<div style="font-family:Figtree,system-ui,sans-serif;">'
-                f'{header_html}{walk_html}{filter_badge}{view_btn_html}'
+                f'{header_html}{walk_html}{hours_row_html}{filter_badge}{view_btn_html}'
                 f'</div>'
             )
             marker_tooltip = shop.name

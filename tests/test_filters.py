@@ -46,3 +46,31 @@ def test_clear_diet_keeps_allergies(app):
 def test_no_allergy_warning_box_in_filters(app):
     boxes = [m.value for m in app.sidebar.markdown if "dl-box--allergy" in m.value]
     assert not boxes
+
+
+def test_sort_by_is_outside_sidebar_and_in_main_view(app):
+    sidebar_selects = [s.label for s in app.sidebar.selectbox]
+    assert "Sort by" not in sidebar_selects
+
+    main_selects = [s.label for s in app.selectbox if s not in app.sidebar.selectbox]
+    assert "Sort by" in main_selects
+
+    sort_box = [s for s in app.selectbox if s.label == "Sort by"][0]
+    sort_box.select("Distance").run()
+    assert not app.exception
+    assert app.session_state["sort_select"] == "Distance"
+
+
+def test_screen_detail_has_no_item_selectors_above_names(app):
+    app.query_params["shop"] = "sainsburys-warren-st"
+    app.run()
+    assert not app.exception
+    assert app.session_state["screen"] == "detail"
+    detail_selects = [s.label for s in app.selectbox]
+    assert "Main" not in detail_selects
+    assert "Snack" not in detail_selects
+    assert "Drink" not in detail_selects
+    swap_buttons = [b for b in app.button if b.label == "Swap in"]
+    assert len(swap_buttons) > 0
+
+

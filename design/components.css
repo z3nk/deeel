@@ -25,6 +25,8 @@
 .dl-badge--ageing { background: var(--warning-tint); color: var(--ageing); }
 .dl-badge--stale { background: var(--sample-tint); color: var(--stale); }
 .dl-badge--credits { background: var(--success-tint); color: var(--success-ink); }
+.dl-badge--open { background: var(--success-tint); color: var(--success-ink); }
+.dl-badge--closed { background: var(--sample-tint); color: var(--text-muted); border: var(--border-width-hairline) solid var(--border); }
 
 /* ---------- Deeel score ---------- */
 .dl-score { display: inline-flex; align-items: baseline; gap: var(--space-1); font-family: var(--font-ui); font-size: 13px; line-height: 16px; font-weight: 700;
@@ -75,6 +77,8 @@
 .dl-card__name { font-size: 16px; line-height: 22px; font-weight: 700; }
 .dl-card__walk { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--text-muted); }
 .dl-card--featured .dl-card__walk { color: var(--text); }
+.dl-card__hours { font-size: 12px; line-height: 16px; color: var(--text-muted); white-space: nowrap; }
+.dl-card--featured .dl-card__hours { color: var(--text); }
 .dl-card__basket { margin: var(--space-2) 0 var(--space-1); font-size: 14px; line-height: 20px; }
 .dl-card__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
 .dl-card--featured .dl-card__meta { color: var(--text); }
@@ -166,7 +170,10 @@
 .dl-item__meta { font-size: 12px; line-height: 16px; color: var(--text-muted); }
 /* Catalogue row on the shop page */
 .dl-row { font-family: var(--font-ui); font-size: 14px; line-height: 20px; color: var(--text); }
+.dl-row__top { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.dl-row__name { font-size: 14px; line-height: 20px; font-weight: 700; color: var(--text); }
 .dl-row__tags { font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.dl-row__actions { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
 /* Task / review cards: states */
 .dl-card--active { border: var(--border-width-strong) solid var(--primary); }
 .dl-card--done { background: var(--success-tint); }
@@ -419,3 +426,70 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
 .st-key-dl_filter_bar [data-testid="stCaptionContainer"] p {
   margin: 0 !important;
 }
+
+/* Mobile-optimised shelf catalogue row styling */
+[class*="dl_shelf_row"] [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--space-2) !important;
+  padding: var(--space-2) 0 !important;
+  border-bottom: var(--border-width-hairline) solid var(--border) !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"] {
+  min-width: 0 !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  text-align: right !important;
+  gap: var(--space-1) !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stVerticalBlock"] {
+  align-items: flex-end !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stElementContainer"] {
+  width: auto !important;
+  margin-left: auto !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+}
+
+[class*="dl_shelf_row"] .dl-row__actions {
+  display: flex !important;
+  justify-content: flex-end !important;
+  text-align: right !important;
+  width: 100% !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child button {
+  width: auto !important;
+  white-space: nowrap !important;
+  margin-left: auto !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stCaptionContainer"] {
+  text-align: right !important;
+  margin-left: auto !important;
+}
+
+[class*="dl_shelf_row"] [data-testid="stColumn"]:last-child [data-testid="stCaptionContainer"] p {
+  margin: 0 !important;
+}
+

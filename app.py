@@ -46,6 +46,7 @@ from photo_store import (
     PHOTO_TYPE_LABELS, PHOTO_TYPES, UPLOAD_EXTENSIONS, UPLOAD_ROOT, save_photo, set_storefront,
 )
 from shop_images import logo_html, storefront_path
+from hours import is_shop_open, get_formatted_hours
 from models import Preferences
 from optimiser import (
     get_results,
@@ -264,6 +265,9 @@ def render_sidebar() -> Preferences:
 
     # Preferences
     st.sidebar.markdown("**Preferences**")
+    if "open_now_override" in st.session_state:
+        st.session_state["open_now_only"] = st.session_state.pop("open_now_override")
+    open_now_only = st.sidebar.toggle("Open now only", value=False, key="open_now_only")
     max_price = st.sidebar.slider("Max price (£)", 2.0, 14.0, 6.0, step=0.25)
     if "walk_limit_override" in st.session_state:
         st.session_state["walk_limit"] = st.session_state.pop("walk_limit_override")
@@ -287,21 +291,16 @@ def render_sidebar() -> Preferences:
     has_sparks = st.sidebar.checkbox("M&S Sparks", value=True, key="card_sparks")
     has_mywaitrose = st.sidebar.checkbox("myWaitrose", value=True, key="card_mywaitrose")
     has_club_pret = st.sidebar.checkbox("Club Pret", value=True, key="card_club_pret")
-    st.sidebar.divider()
 
-    # Sort
-    sort_label = st.sidebar.selectbox(
-        "Sort by",
-        options=["Deeel score", "Quality", "Distance", "Price (low to high)"],
-        key="sort_select",
-    )
+    sort_label = st.session_state.get("sort_select", "Deeel score")
     sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
 
     return Preferences(
-        sort=sort_map[sort_label],
+        sort=sort_map.get(sort_label, "deeel"),
         temperature_pref=temp,
         max_price_gbp=max_price,
         max_walking_minutes=float(walk_limit),
+        open_now_only=open_now_only,
         diet_flags=[d.lower() for d in diet_flags],
         allergens_exclude=[a.lower() for a in avoid],
         meats_allowed=[m.lower() for m in meats],
@@ -481,6 +480,13 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
         top.append('<span class="dl-badge dl-badge--best">Best match</span>')
     if sample:
         top.append('<span class="dl-badge dl-badge--sample">Sample data</span>')
+    is_open = is_shop_open(lunch.shop.shop_id)
+    badge_cls = "dl-badge--open" if is_open else "dl-badge--closed"
+    status_text = "Open Now" if is_open else "Closed"
+    top.append(f'<span class="dl-badge {badge_cls}">{status_text}</span>')
+    hours_str = get_formatted_hours(lunch.shop.shop_id)
+    if hours_str:
+        top.append(f'<span class="dl-card__hours">{escape(hours_str)}</span>')
     top.append(f'<span class="dl-card__walk">{lunch.shop.walking_minutes:.0f} min walk</span>')
 
     body = [f'<div class="dl-card__top">{"".join(top)}</div>']
@@ -532,17 +538,41 @@ def _section_title(text: str) -> None:
 
 def screen_find(prefs: Preferences):
     shops, items, deals = _load_data()
+    sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
     primary, alternatives, other_shops = get_results(shops, items, deals, prefs)
 
     list_tab, map_tab = st.tabs(["List view", "Map view"])
 
     with list_tab:
+        top_left, top_right = st.columns([3, 2], vertical_alignment="center")
+        with top_left:
+            in_range_shops = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not prefs.open_now_only or is_shop_open(s.shop_id))]
+            in_range_count = len(in_range_shops)
+            open_suffix = " open" if prefs.open_now_only else ""
+            st.caption(f"{in_range_count} shops{open_suffix} within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
+        with top_right:
+            selected_sort = st.selectbox(
+                "Sort by",
+                options=["Deeel score", "Quality", "Distance", "Price (low to high)"],
+                key="sort_select",
+            )
+            desired_sort = sort_map.get(selected_sort, "deeel")
+            if prefs.sort != desired_sort:
+                prefs = prefs.model_copy(update={"sort": desired_sort})
+                primary, alternatives, other_shops = get_results(shops, items, deals, prefs)
+
         if primary is None:
             # Diagnose which filter is blocking
             filtered = hard_filter(items, prefs)
-            in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes]
+            in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not prefs.open_now_only or is_shop_open(s.shop_id))]
             if not in_range:
-                st.info("No shops within your walking limit.")
+                if prefs.open_now_only:
+                    st.info("No shops open within your walking limit.")
+                    if st.button("Show closed shops too", key="disable_open_now"):
+                        st.session_state["open_now_override"] = False
+                        st.rerun()
+                else:
+                    st.info("No shops within your walking limit.")
                 if st.button("Relax to 15 min", key="relax_walk"):
                     st.session_state["walk_limit_override"] = 15
                     st.rerun()
@@ -583,9 +613,6 @@ def screen_find(prefs: Preferences):
                     st.rerun()
             return
 
-        in_range_count = sum(1 for s in shops if s.walking_minutes <= prefs.max_walking_minutes)
-        st.caption(f"{in_range_count} shops within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
-
         # Section A — featured best option
         _section_title("Your best option")
         render_result_card(primary, rank=1, prefs=prefs, featured=True)
@@ -612,15 +639,18 @@ def screen_find(prefs: Preferences):
                        if isinstance(i.last_seen, str)
                        and (date.today() - date.fromisoformat(i.last_seen)).days > 14]
         stale_shop_ids = {i.shop_id for i in stale_items} - all_ranked_ids
-        if stale_shop_ids:
+        stale_shop_objs = [s for s in shops if s.shop_id in stale_shop_ids and (not prefs.open_now_only or is_shop_open(s.shop_id))]
+        if stale_shop_objs:
             # Stale card (ResultCard spec): sample-tint, no opacity dimming (that failed contrast)
             cards = "".join(
                 f'<div class="dl-card dl-card--stale"><div class="dl-card__top">{logo_html(shop, size=20)}'
                 f'<span class="dl-card__name">{escape(shop.name)}</span>'
                 f'<span class="dl-badge dl-badge--stale">Data too old</span>'
+                f'<span class="dl-badge {"dl-badge--open" if is_shop_open(shop.shop_id) else "dl-badge--closed"}">{"Open Now" if is_shop_open(shop.shop_id) else "Closed"}</span>'
+                f'<span class="dl-card__hours">{escape(get_formatted_hours(shop.shop_id))}</span>'
                 f'<span class="dl-card__walk">{shop.walking_minutes:.0f} min walk</span></div>'
                 f'<div class="dl-card__meta" style="color:var(--stale)">Not ranked — last seen over 14 days ago</div></div>'
-                for shop in shops if shop.shop_id in stale_shop_ids
+                for shop in stale_shop_objs
             )
             st.markdown(f'<div class="dl-stale-list">{cards}</div>', unsafe_allow_html=True)
 
@@ -632,11 +662,15 @@ def screen_find(prefs: Preferences):
         all_ranked = [primary] + other_shops if primary else []
         for l in all_ranked:
             st.session_state[f"why_{l.shop.shop_id}"] = l.why or ""
+        map_shops = [s for s in shops if not prefs.open_now_only or is_shop_open(s.shop_id)]
         fmap = build_map(
             ranked_lunches=all_ranked,
-            all_shops=shops,
+            all_shops=map_shops,
             walking_limit_minutes=prefs.max_walking_minutes,
+            open_now_only=prefs.open_now_only,
         )
+        map_open_suffix = " open" if prefs.open_now_only else ""
+        st.caption(f"{len(map_shops)} shops{map_open_suffix} shown on map")
         map_data = st_folium(
             fmap,
             width=900,
@@ -655,17 +689,17 @@ def screen_find(prefs: Preferences):
                 clng = clicked_obj.get("lng")
                 if clat is not None and clng is not None:
                     match = next(
-                        (s for s in shops if abs(s.lat - clat) < 0.0003 and abs(s.lng - clng) < 0.0003),
+                        (s for s in map_shops if abs(s.lat - clat) < 0.0003 and abs(s.lng - clng) < 0.0003),
                         None,
                     )
                     if match:
                         clicked_shop_id = match.shop_id
             if not clicked_shop_id and clicked_tooltip:
-                match = next((s for s in shops if s.name.lower() in clicked_tooltip.lower()), None)
+                match = next((s for s in map_shops if s.name.lower() in clicked_tooltip.lower()), None)
                 if match:
                     clicked_shop_id = match.shop_id
             if not clicked_shop_id and clicked_popup:
-                match = next((s for s in shops if s.name.lower() in str(clicked_popup).lower()), None)
+                match = next((s for s in map_shops if s.name.lower() in str(clicked_popup).lower()), None)
                 if match:
                     clicked_shop_id = match.shop_id
 
@@ -675,13 +709,17 @@ def screen_find(prefs: Preferences):
         else:
             selected_shop_id = st.session_state.get("map_selected_shop_id")
 
+        if selected_shop_id and prefs.open_now_only and not is_shop_open(selected_shop_id):
+            selected_shop_id = primary.shop.shop_id if primary else None
+            st.session_state["map_selected_shop_id"] = selected_shop_id
+
         # Fallback to primary shop if nothing selected yet
         if not selected_shop_id and primary:
             selected_shop_id = primary.shop.shop_id
             st.session_state["map_selected_shop_id"] = selected_shop_id
 
         if selected_shop_id:
-            sel_shop = next((s for s in shops if s.shop_id == selected_shop_id), None)
+            sel_shop = next((s for s in map_shops if s.shop_id == selected_shop_id), None)
             sel_lunch = next((l for l in all_ranked if l.shop.shop_id == selected_shop_id), None)
             if sel_shop:
                 with st.container(border=True):
@@ -693,6 +731,15 @@ def screen_find(prefs: Preferences):
                             rank_prefix = f"#{sel_rank} " if sel_rank > 0 else ""
                         st.markdown(
                             f"{logo_html(sel_shop)}<b>{rank_prefix}{sel_shop.name}</b>",
+                            unsafe_allow_html=True,
+                        )
+                        sel_is_open = is_shop_open(sel_shop.shop_id)
+                        sel_badge_cls = "dl-badge--open" if sel_is_open else "dl-badge--closed"
+                        sel_status_label = "Open Now" if sel_is_open else "Closed"
+                        sel_hours = get_formatted_hours(sel_shop.shop_id)
+                        sel_hours_html = f' <span class="dl-card__hours">{escape(sel_hours)}</span>' if sel_hours else ""
+                        st.markdown(
+                            f'<div style="margin: var(--space-1) 0;"><span class="dl-badge {sel_badge_cls}">{sel_status_label}</span>{sel_hours_html}</div>',
                             unsafe_allow_html=True,
                         )
                         st.caption(f"{sel_shop.walking_minutes:.0f} min walk")
@@ -834,6 +881,15 @@ def screen_detail():
     _heading(1, shop.name, prefix_html=logo_html(shop, size=40))
     # Pull the why from the last ranked result for this shop if available
     why_text = st.session_state.get(f"why_{shop_id}", "")
+    is_open = is_shop_open(shop_id)
+    badge_cls = "dl-badge--open" if is_open else "dl-badge--closed"
+    status_label = "Open Now" if is_open else "Closed"
+    hours_str = get_formatted_hours(shop_id)
+    if hours_str:
+        st.markdown(
+            f'<div style="margin: var(--space-1) 0 var(--space-2);"><span class="dl-badge {badge_cls}">{status_label}</span> <span class="dl-card__hours">{escape(hours_str)}</span></div>',
+            unsafe_allow_html=True,
+        )
     sub = f"{shop.walking_minutes:.0f} min walk from campus"
     if why_text:
         sub += f" · {why_text}"
@@ -862,17 +918,9 @@ def screen_detail():
         for options, pick in ((mains, best.main), (snacks, best.snack), (drinks, best.drink)):
             options.sort(key=lambda i, pick=pick: i.item_id != pick.item_id)
 
-    # Per-category dropdowns
-    def _item_label(item) -> str:
-        hot = " · hot" if item.temperature == "hot" else ""
-        nd = " · not in deal" if item.meal_deal_eligible is False else ""
-        pend = " · unverified" if item.status == "pending" else ""
-        return f"{item.name} — {_fmt_price(item)}{hot}{nd}{pend}"
-
     key_prefix = f"detail_{shop_id}"
 
-    # Apply any pending swaps / resets BEFORE widgets are instantiated
-    # (writing a widget's key after it renders raises StreamlitAPIException)
+    # Apply any pending swaps / resets BEFORE display
     for cat in ("main", "snack", "drink"):
         pending = f"{key_prefix}_{cat}_pending"
         if pending in st.session_state:
@@ -886,12 +934,10 @@ def screen_detail():
     ):
         with col:
             st.markdown(f'<div class="dl-eyebrow">{label}</div>', unsafe_allow_html=True)
-            idx = st.selectbox(
-                label, range(len(options)),
-                format_func=lambda i, options=options: _item_label(options[i]),
-                key=f"{key_prefix}_{cat}",
-                label_visibility="collapsed",
-            )
+            idx = st.session_state.get(f"{key_prefix}_{cat}", 0)
+            if idx >= len(options):
+                idx = 0
+            st.session_state[f"{key_prefix}_{cat}"] = idx
             picked[cat] = (idx, options[idx])
             st.markdown(_item_info_html(options[idx]), unsafe_allow_html=True)
     (main_idx, main), (snack_idx, snack), (drink_idx, drink) = picked["main"], picked["snack"], picked["drink"]
@@ -942,34 +988,38 @@ def screen_detail():
         unverified = (' <span class="dl-badge dl-badge--unverified">Unverified</span>'
                       if item.status == "pending" else "")
 
-        # Stale rows are flagged by the "Seen Nd ago" badge, not dimmed (dimming fails contrast)
-        row_cols = st.columns([3, 1, 2, 1, 1])
-        with row_cols[0]:
-            st.markdown(
-                f'<div class="dl-row"><strong>{escape(item.name)}</strong>{unverified}'
-                f'<div class="dl-row__tags">{" · ".join(tags)}</div></div>',
-                unsafe_allow_html=True,
-            )
-        with row_cols[1]:
-            st.markdown(_price_html(item), unsafe_allow_html=True)
-        with row_cols[2]:
-            st.markdown(_item_allergen_html(item), unsafe_allow_html=True)
-        with row_cols[3]:
-            st.markdown(_freshness_badge(str(item.last_seen)), unsafe_allow_html=True)
-        with row_cols[4]:
-            cat = item.category
-            options = {"main": mains, "snack": snacks, "drink": drinks}[cat]
-            try:
-                idx = options.index(item)
-            except ValueError:
-                idx = None
-            current_key = f"{key_prefix}_{cat}"
-            if idx is not None and st.session_state.get(current_key, 0) == idx:
-                st.caption("In basket")
-            elif idx is not None:
-                if st.button("Swap in", key=f"swap_{item.item_id}"):
-                    st.session_state[f"{current_key}_pending"] = idx
-                    st.rerun()
+        cat = item.category
+        options = {"main": mains, "snack": snacks, "drink": drinks}[cat]
+        try:
+            idx = options.index(item)
+        except ValueError:
+            idx = None
+        current_key = f"{key_prefix}_{cat}"
+        in_basket = (idx is not None and st.session_state.get(current_key, 0) == idx)
+
+        with st.container(key=f"dl_shelf_row_{item.item_id}"):
+            info_col, action_col = st.columns([3, 1], vertical_alignment="center")
+            with info_col:
+                allergen_html = _item_allergen_html(item)
+                st.markdown(
+                    f'<div class="dl-row">'
+                    f'<div class="dl-row__top"><strong class="dl-row__name">{escape(item.name)}</strong>{unverified} · {_price_html(item)}</div>'
+                    f'<div class="dl-row__tags">{" · ".join(tags)}</div>'
+                    f'{allergen_html}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            with action_col:
+                st.markdown(
+                    f'<div class="dl-row__actions">{_freshness_badge(str(item.last_seen))}</div>',
+                    unsafe_allow_html=True,
+                )
+                if in_basket:
+                    st.caption("In basket")
+                elif idx is not None:
+                    if st.button("Swap in", key=f"swap_{item.item_id}"):
+                        st.session_state[f"{current_key}_pending"] = idx
+                        st.rerun()
 
 
 # ---------------------------------------------------------------------------

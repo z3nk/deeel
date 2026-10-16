@@ -20,12 +20,13 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections import Counter
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 from deeel import DeeelScore, deeel_score, ingredient_score
 from openfoodfacts import SOURCE as OFF_SOURCE
 from models import Deal, Item, Lunch, Preferences, Shop
+from hours import is_shop_open
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -515,6 +516,7 @@ def rank_shops(
     deals: list[Deal],
     prefs: Preferences,
     today: date | None = None,
+    now: datetime | None = None,
 ) -> list[Lunch]:
     """
     Apply hard filters, find the best lunch per shop, rank by score (desc),
@@ -523,8 +525,10 @@ def rank_shops(
     """
     today = today or date.today()
 
-    # Filter shops by walking limit
+    # Filter shops by walking limit and operating hours
     in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes]
+    if prefs.open_now_only:
+        in_range = [s for s in in_range if is_shop_open(s.shop_id, now)]
 
     # Filter items
     filtered_items = hard_filter(items, prefs, today)
@@ -628,6 +632,7 @@ def get_results(
     deals: list[Deal],
     prefs: Preferences,
     today: date | None = None,
+    now: datetime | None = None,
 ) -> tuple[Optional[Lunch], list[Lunch], list[Lunch]]:
     """
     Three-section results as per PLAN.md:
@@ -637,7 +642,7 @@ def get_results(
         alternatives  — up to 3 more Lunches at primary.shop (varying main)
         other_shops   — best Lunch from the next 3 ranked shops
     """
-    ranked = rank_shops(shops, items, deals, prefs, today)
+    ranked = rank_shops(shops, items, deals, prefs, today, now)
 
     if not ranked:
         return None, [], []
