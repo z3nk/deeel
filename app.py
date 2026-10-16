@@ -537,6 +537,7 @@ def _section_title(text: str) -> None:
 # ---------------------------------------------------------------------------
 
 def screen_find(prefs: Preferences):
+    open_now = bool(getattr(prefs, "open_now_only", False))
     shops, items, deals = _load_data()
     sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
     primary, alternatives, other_shops = get_results(shops, items, deals, prefs)
@@ -546,9 +547,9 @@ def screen_find(prefs: Preferences):
     with list_tab:
         top_left, top_right = st.columns([3, 2], vertical_alignment="center")
         with top_left:
-            in_range_shops = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not prefs.open_now_only or is_shop_open(s.shop_id))]
+            in_range_shops = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not open_now or is_shop_open(s.shop_id))]
             in_range_count = len(in_range_shops)
-            open_suffix = " open" if prefs.open_now_only else ""
+            open_suffix = " open" if open_now else ""
             st.caption(f"{in_range_count} shops{open_suffix} within {int(prefs.max_walking_minutes)} min · sponsors never affect ranking")
         with top_right:
             selected_sort = st.selectbox(
@@ -564,9 +565,9 @@ def screen_find(prefs: Preferences):
         if primary is None:
             # Diagnose which filter is blocking
             filtered = hard_filter(items, prefs)
-            in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not prefs.open_now_only or is_shop_open(s.shop_id))]
+            in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes and (not open_now or is_shop_open(s.shop_id))]
             if not in_range:
-                if prefs.open_now_only:
+                if open_now:
                     st.info("No shops open within your walking limit.")
                     if st.button("Show closed shops too", key="disable_open_now"):
                         st.session_state["open_now_override"] = False
@@ -639,7 +640,7 @@ def screen_find(prefs: Preferences):
                        if isinstance(i.last_seen, str)
                        and (date.today() - date.fromisoformat(i.last_seen)).days > 14]
         stale_shop_ids = {i.shop_id for i in stale_items} - all_ranked_ids
-        stale_shop_objs = [s for s in shops if s.shop_id in stale_shop_ids and (not prefs.open_now_only or is_shop_open(s.shop_id))]
+        stale_shop_objs = [s for s in shops if s.shop_id in stale_shop_ids and (not open_now or is_shop_open(s.shop_id))]
         if stale_shop_objs:
             # Stale card (ResultCard spec): sample-tint, no opacity dimming (that failed contrast)
             cards = "".join(
@@ -662,14 +663,14 @@ def screen_find(prefs: Preferences):
         all_ranked = [primary] + other_shops if primary else []
         for l in all_ranked:
             st.session_state[f"why_{l.shop.shop_id}"] = l.why or ""
-        map_shops = [s for s in shops if not prefs.open_now_only or is_shop_open(s.shop_id)]
+        map_shops = [s for s in shops if not open_now or is_shop_open(s.shop_id)]
         fmap = build_map(
             ranked_lunches=all_ranked,
             all_shops=map_shops,
             walking_limit_minutes=prefs.max_walking_minutes,
-            open_now_only=prefs.open_now_only,
+            open_now_only=open_now,
         )
-        map_open_suffix = " open" if prefs.open_now_only else ""
+        map_open_suffix = " open" if open_now else ""
         st.caption(f"{len(map_shops)} shops{map_open_suffix} shown on map")
         map_data = st_folium(
             fmap,
@@ -709,7 +710,7 @@ def screen_find(prefs: Preferences):
         else:
             selected_shop_id = st.session_state.get("map_selected_shop_id")
 
-        if selected_shop_id and prefs.open_now_only and not is_shop_open(selected_shop_id):
+        if selected_shop_id and open_now and not is_shop_open(selected_shop_id):
             selected_shop_id = primary.shop.shop_id if primary else None
             st.session_state["map_selected_shop_id"] = selected_shop_id
 

@@ -7,7 +7,7 @@ All three record types (Shop, Deal, Item) plus User, CreditEvent, Reward.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -213,3 +213,9 @@ class Preferences(BaseModel):
     open_now_only: bool = False
 
     model_config = {"frozen": True}
+
+    def __getattr__(self, item: str) -> Any:
+        if item == "open_now_only":
+            return False
+        return super().__getattr__(item)
+

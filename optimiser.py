@@ -527,7 +527,7 @@ def rank_shops(
 
     # Filter shops by walking limit and operating hours
     in_range = [s for s in shops if s.walking_minutes <= prefs.max_walking_minutes]
-    if prefs.open_now_only:
+    if getattr(prefs, "open_now_only", False):
         in_range = [s for s in in_range if is_shop_open(s.shop_id, now)]
 
     # Filter items
