@@ -72,7 +72,7 @@ Empty states name the cause and give a one-tap fix: "Relax to 15 min", "Clear di
 [theme]
 base = "light"
 primaryColor = "#0F7B5F"
-backgroundColor = "#F7F7F4"
+backgroundColor = "#FEF9EB"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#1F2328"
 font = "sans serif"
@@ -89,9 +89,11 @@ Figtree and Bricolage Grotesque reach the page through the injected CSS (`@impor
 
 ## Logo
 
-- A teammate is making the logo. Do not design, draw or approximate one.
-- Until it arrives, set the placeholder wordmark "Deeelicious" in `display` at 800, in `text` or `primary` on `bg` or `surface`, and in `on-primary` on `primary`.
-- Every layout keeps a logo slot. Keep clear space of at least `space-4` on all sides in the app and `space-8` in marketing. Minimum wordmark height is 20px on screen. Place it only on `bg`, `surface`, `primary` or `accent-yellow`, never over photos or patterns.
+- The logo is final. Masters are SVGs in `design/brandkit/`: `logo-full.svg` (icon over wordmark), `logo-icon.svg` (the green rounded-square "D" with a fork and a leaf) and `logo-text.svg` (the "Deeelicious" wordmark with a leaf on the i). Do not redraw, recolour, stretch or approximate it.
+- The app uses transparent PNG exports in `assets/brand/`: `logo-text.png` (sidebar header) and `logo-icon-{64,192,512}.png` (browser tab, social). Re-export from the SVGs if the logo changes.
+- Logo colours are its own: deep green `#0b4725` and leaf lime. They are not design tokens and don't replace `primary`.
+- `logo-icon.svg` and `logo-full.svg` carry a cream `#fef9eb` background, and `logo-text.svg` a white one. Use the transparent PNGs on `bg`, `surface` or `accent-yellow`. On `primary` green the dark wordmark disappears, so use the icon, which has its own green tile.
+- Every layout keeps a logo slot. Keep clear space of at least `space-4` on all sides in the app and `space-8` in marketing. Minimum wordmark height is 20px on screen. Place it only on `bg`, `surface` or `accent-yellow` (the icon also works on `primary`), never over photos or patterns.
 
 ## Iconography
 
@@ -108,8 +110,8 @@ Figtree and Bricolage Grotesque reach the page through the injected CSS (`@impor
 
 - Use the same tokens, type and logo rules as the app. Hype mode is the default; any allergy claim is in serious mode.
 - Claims: never "always the cheapest", never "allergen-safe", no supermarket logos, no UCL or Students' Union logos, crests, colours or names as branding, and no implied partnerships. Sponsor slots are allowed but must stay visibly separate from rankings.
-- Ground headlines in real features: "Your meal deal, but with maths." · "£3.85 or £5.55? We checked the shelf." · "Lunch ranked out of 100. Meet the Deeel score." · "Six shops. Ten minutes. One best lunch." · "Snap a shelf, earn credits."
+- Ground headlines in real features: "A deeel for you" · "£3.85 or £5.55? We checked the shelf." · "Lunch ranked out of 100. Meet the Deeel score." · "Six shops. Ten minutes. One best lunch." · "Snap a shelf, earn credits."
 
 ## Not synced
 
-From z3nk/deeelicious@e043479. The repo has no token file, font files, logo or icons, and no component library (it is Streamlit/Python). Tokens come from DESIGN_BRIEF.md, UI_BRIEF.md, `.streamlit/config.toml` and the inline styles in `app.py`, `map_view.py` and `shop_images.py`. Fonts are Google-hosted, so there are no files. Components are static, hand-written renditions (no bundle.js). These shades were darkened from the code for AA: `score-*`, `fresh`, `ageing` and `stale`. Rank labels and Sainsbury's initials switched to dark ink. Not covered: the map popup, the upload table, credits, the review queue, the demo tour and marketing templates.
+From z3nk/deeelicious@e043479. The repo had no token file, font files, logo or icons at sync time (the logo has since been added in `design/brandkit/`), and no component library (it is Streamlit/Python). Tokens come from DESIGN_BRIEF.md, UI_BRIEF.md, `.streamlit/config.toml` and the inline styles in `app.py`, `map_view.py` and `shop_images.py`. Fonts are Google-hosted, so there are no files. Components are static, hand-written renditions (no bundle.js). These shades were darkened from the code for AA: `score-*`, `fresh`, `ageing` and `stale`. Rank labels and Sainsbury's initials switched to dark ink. Not covered: the map popup, the upload table, credits, the review queue, the demo tour and marketing templates.

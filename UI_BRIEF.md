@@ -404,7 +404,7 @@ Review queue  (3 items pending)
 | Token | Purpose | Hex |
 |-------|---------|-----|
 | `--primary` | Buttons, active tab, featured card border | `#0F7B5F` |
-| `--bg` | Page background | `#F7F7F4` |
+| `--bg` | Page background | `#FEF9EB` |
 | `--card` | Card background | `#FFFFFF` |
 | `--border` | Card and input borders | `#E3E3DE` |
 | `--text` | Body text | `#1F2328` |

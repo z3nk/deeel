@@ -38,7 +38,7 @@ Neeam chose **B**. A and C are kept below for reference. The brand has to carry 
 
 ### Brand basics to define
 
-- **Logo:** **a teammate is making the logo — do not design one.** Leave a logo slot in every layout and specify clear-space, minimum size and which backgrounds it may sit on; use a placeholder wordmark "Deeelicious" in the display face until the real logo arrives.
+- **Logo:** final, in `design/brandkit/` (see design/README.md). Do not redraw or recolour it. Keep a logo slot in every layout with the clear-space, minimum size and background rules from design/README.md.
 - **Colour (decided):** keep **Deeel green `#0F7B5F`** as the anchor/primary, plus three saturated B accents: **sunshine yellow `#FFD23F`**, **electric violet `#7B2FF7`**, **cyan `#00C2FF`**. No pinks or reds in the brand palette, so danger/allergen red (§5) never reads as decoration. Refine shades for contrast (e.g. yellow and cyan carry dark text only), but keep the hues.
 - **Typography:** one display face (headlines, marketing, score numerals) + one UI face (must render well in Streamlit via Google Fonts or the system stack). Tabular numerals required for prices.
 - **Iconography:** simple line icons; needs: walk (minutes), hot/cold, meal deal, card/loyalty, camera/upload, credits, map pin, allergen warning, barcode, sample data, "?".
@@ -84,7 +84,7 @@ Return tokens that map 1:1 to `.streamlit/config.toml` + CSS custom properties (
 | Token | Use | Current |
 |---|---|---|
 | `--primary` | Buttons, active states, featured card border, "Best match" | `#0F7B5F` |
-| `--bg` | Page background | `#F7F7F4` |
+| `--bg` | Page background | `#FEF9EB` |
 | `--surface` | Cards, sidebar | `#FFFFFF` |
 | `--border` | Card/input borders | `#E3E3DE` |
 | `--text` / `--text-muted` | Body / secondary | `#1F2328` / `#6B7280` |
@@ -169,7 +169,7 @@ Same tokens, typography and logo as the app.
 - **App screenshot frames** (phone + laptop) for the above.
 
 **Headline starters (grounded in real features — refine):**
-- "Your meal deal, but with maths."
+- "A deeel for you"
 - "£3.85 or £5.55? We checked the shelf."
 - "Lunch ranked out of 100. Meet the Deeel score."
 - "Allergy-aware lunch finding — and we'll always tell you to check the pack."
@@ -185,7 +185,7 @@ Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos
 1. **Brand:** direction B applied — colour palette (built on the decided hues), type pairing, logo placement rules (no logo design).
 2. **Tokens** as both a table and JSON, e.g.
    ```json
-   {"color": {"primary": "#0F7B5F", "bg": "#F7F7F4", "surface": "#FFFFFF", "text": "#1F2328", "...": "..."},
+   {"color": {"primary": "#0F7B5F", "bg": "#FEF9EB", "surface": "#FFFFFF", "text": "#1F2328", "...": "..."},
     "font": {"display": "...", "ui": "..."}, "radius": {"chip": 999, "card": 12}, "space": [4, 8, 12, 16, 24, 32]}
    ```
    plus the exact `config.toml` `[theme]` block (light only) and a CSS `:root` variables block.
@@ -200,7 +200,7 @@ Claims rules: no "always the cheapest", no "allergen-safe", no supermarket logos
 
 1. Brand direction: **B, "Snack hype"**, with safety surfaces kept calm and serious.
 2. Colour: **Deeel green `#0F7B5F` + sunshine yellow `#FFD23F`, electric violet `#7B2FF7`, cyan `#00C2FF`**; no pinks/reds in the brand palette.
-3. Logo: **made by a teammate** — Claude Design provides placement rules only.
+3. Logo: made by a teammate, delivered in `design/brandkit/`.
 4. Filters on phones: **OK to redesign** away from the sidebar.
 5. Rewards / sponsor slots in marketing: **yes**, kept separate from rankings.
 6. Dark mode: **not for launch** — light theme only.

@@ -60,6 +60,7 @@ from optimiser import (
     _row_to_deal,
 )
 
+BRAND_DIR = Path(__file__).parent / "assets" / "brand"   # logo exports of design/brandkit/*.svg
 UPLOAD_DIR = UPLOAD_ROOT
 UPLOAD_DIR.mkdir(exist_ok=True)
 # Map popup uses native button to navigate parent
@@ -70,7 +71,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 st.set_page_config(
     page_title="Deeelicious",
-    page_icon="🥪",
+    page_icon=str(BRAND_DIR / "logo-icon-192.png"),
     layout="wide",
     initial_sidebar_state="auto",   # expanded on desktop, collapsed on phones
 )
@@ -204,7 +205,7 @@ def _apply_pending_resets() -> None:
 
 def render_sidebar() -> Preferences:
     _apply_pending_resets()
-    st.sidebar.title("🥪 Deeelicious")
+    st.sidebar.image(str(BRAND_DIR / "logo-text.png"), width=190)
 
     # Username
     st.sidebar.text_input(
@@ -442,10 +443,13 @@ def _allergy_box() -> str:
     return ""
 
 
-def _allergen_line_html(items_list) -> str:
-    """Allergen line without warnings."""
+def _allergen_line_html(items_list, warn: bool = False) -> str:
+    """Allergen line. Only the featured card adds the short computer-read warning
+    (one per results page, not one per card)."""
     text = _allergen_line(items_list, [])
-    return f'<div class="dl-allergen-line dl-card__note">{escape(text)}</div>'
+    warning = (f' · <span class="dl-allergen-line__warn">{escape(ALLERGY_WARNING_SHORT)}</span>'
+               if warn else "")
+    return f'<div class="dl-allergen-line dl-card__note">{escape(text)}{warning}</div>'
 
 
 def _deal_html(lunch) -> str:
@@ -494,7 +498,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
     nutrition = _nutrition_line(trio)
     if nutrition:
         body.append(f'<div class="dl-card__meta">{escape(nutrition)}</div>')
-    body.append(_allergen_line_html(trio))
+    body.append(_allergen_line_html(trio, warn=featured))
     if lunch.why:
         body.append(f'<div class="dl-card__meta dl-card__note"><em>{escape(lunch.why)}</em></div>')
 
@@ -542,6 +546,7 @@ def screen_find(prefs: Preferences):
     sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
     primary, alternatives, other_shops = get_results(shops, items, deals, prefs)
 
+    st.markdown('<h1 class="dl-type-h1 dl-find-title">A deeel for you</h1>', unsafe_allow_html=True)
     list_tab, map_tab = st.tabs(["List view", "Map view"])
 
     with list_tab:

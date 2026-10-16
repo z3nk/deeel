@@ -493,3 +493,6 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
   margin: 0 !important;
 }
 
+
+/* ---------- Find screen header (A deeel for you) ---------- */
+.dl-find-title { margin: 0 0 var(--space-2); font-family: var(--font-display); color: var(--logo-green); }

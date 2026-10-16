@@ -14,6 +14,7 @@ Design for "Deeelicious", a student app that finds the best lunch (main + snack 
 1. WHAT DEEELICIOUS IS
 ====================================================================
 
+- Slogan: "A deeel for you".
 - One line: Deeelicious finds your best lunch near UCL Bloomsbury: the best main + snack + drink, meal deal against buying separately, ranked out of 100.
 - Who uses it: students, on a phone, standing in a shop, deciding in under 30 seconds.
 - The shops: Tesco, Sainsbury's, Waitrose, M&S, Lidl and Pret near UCL Bloomsbury.
@@ -69,7 +70,7 @@ HYPE ACCENTS (marketing and fun bits only)
   Stickers and marketing blocks. DARK TEXT ONLY, never white.
 
 NEUTRALS
-- Off-white (page background) ........ #F7F7F4
+- Cream (page background, from the logo)  #FEF9EB
 - White (cards, surfaces) ............ #FFFFFF
 - Ink (main text, outlines, shadows) . #1F2328
 - Muted grey (secondary text) ........ #6B7280  (only on white or off-white)
@@ -152,12 +153,13 @@ EFFECTS
 7. LOGO
 ====================================================================
 
-- A teammate is designing the logo. Don't let Canva AI generate or approximate one.
-- Until it's ready, use the wordmark "Deeelicious" typed in Bricolage Grotesque ExtraBold (800), in ink or Deeel Green on off-white/white, or in white on Deeel Green.
+- The final logo is done. Upload the files from design/brandkit/ (logo-full.svg, logo-icon.svg, logo-text.svg) to the Canva Brand Kit and use those. Don't let Canva AI generate, redraw, recolour or approximate it.
+- Logo-full: the green rounded-square "D" icon (cream D with a fork cut out and a lime leaf) stacked over the "Deeelicious" wordmark. Logo-icon: the square icon alone, for avatars, favicons and small spaces. Logo-text: the wordmark alone (dark green, leaf on the i), for headers and wide spaces.
+- The logo's own colours are deep green #0B4725 and leaf lime. Don't recolour it to match the palette. The dark wordmark won't show on Deeel Green or violet, so put it on off-white, white or Sunshine Yellow, and use the icon on green.
 - Leave a logo slot in every layout.
 - Clear space: at least 32px (at app scale) on all sides in marketing.
 - Minimum height: 20px on screen.
-- Place it only on off-white, white, Deeel Green or Sunshine Yellow. Never over photos or patterns.
+- Place it only on off-white, white or Sunshine Yellow (the icon also works on Deeel Green). Never over photos or patterns.
 
 
 ====================================================================
@@ -186,7 +188,7 @@ WRITE THIS / NOT THIS
 - "Best basket" ....................... not "optimised result"
 
 HEADLINES YOU CAN USE
-- "Your meal deal, but with maths."
+- "A deeel for you" (the main slogan)
 - "£3.85 or £5.55? We checked the shelf."
 - "Lunch ranked out of 100. Meet the Deeel score."
 - "Six shops. Ten minutes. One best lunch."
@@ -217,7 +219,7 @@ CTA BUTTON TEXT
 
 PITCH DECK (16:9, 1920x1080)
 - Slides: Title · Problem · Demo screenshot · How the Deeel score works · Data and trust · Team.
-- Title slide: off-white or Deeel Green background, big wordmark, one headline, one accent sticker.
+- Title slide: off-white or Deeel Green background, big logo, one headline, one accent sticker.
 - Deeel score slide: big score numeral in a violet or green badge, with the five weights (value 30, fillingness 25, ingredient quality 25, nutrition balance 10, deal saving 10) as a simple bar or list.
 - Data and trust slide: serious mode. Shelf photos, label-only allergy data, "unknown counts as unsafe", team review before credits pay out, Open Food Facts credit.
 - One idea per slide, big numbers, lots of off-white space.
