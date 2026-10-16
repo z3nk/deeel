@@ -606,3 +606,13 @@ iframe { border-radius: 12px; }
 /* Streamlit gives every markdown block a -16px bottom margin to cancel its paragraph spacing; raw-HTML blocks
    have no paragraph, so the row measured 16px short and its divider cut through the text */
 [class*="dl_shelf_row"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
+
+/* ---------- Sidebar toggles: always visible, never hover-only ---------- */
+[data-testid="stSidebarCollapseButton"], [data-testid="stSidebarCollapseButton"] button { opacity: 1 !important; visibility: visible !important; }
+[data-testid="stExpandSidebarButton"] { opacity: 1 !important; visibility: visible !important; display: inline-flex !important; align-items: center; gap: var(--space-2);
+  background: var(--logo-green) !important; color: var(--on-primary) !important; border-radius: var(--radius-chip) !important; padding: var(--space-2) var(--space-4) !important;
+  width: auto !important; height: auto !important; font-family: var(--font-ui); font-size: 14px; font-weight: 600; line-height: 20px; }
+[data-testid="stExpandSidebarButton"], [data-testid="stExpandSidebarButton"] * { color: var(--on-primary) !important; fill: var(--on-primary) !important; }
+[data-testid="stExpandSidebarButton"]::after { content: "Filters"; color: var(--on-primary); }
+[data-testid="stExpandSidebarButton"]:hover { background: var(--primary) !important; }
+[data-testid="stExpandSidebarButton"]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
