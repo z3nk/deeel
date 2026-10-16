@@ -35,9 +35,19 @@ def _value(raw) -> str:
     return f"var(--{match.group(1)})" if match else str(raw)
 
 
-@lru_cache(maxsize=1)
+def _stamp(*paths: Path) -> tuple:
+    """File modification times, used as cache keys so an edited CSS/token file is picked up
+    by a running server (a hot-reloaded app.py would otherwise keep serving the old CSS)."""
+    return tuple(p.stat().st_mtime_ns for p in paths)
+
+
 def tokens_css() -> str:
     """CSS custom properties for every token, plus a class per type style."""
+    return _tokens_css(_stamp(TOKENS_PATH))
+
+
+@lru_cache(maxsize=4)
+def _tokens_css(_stamp_key: tuple) -> str:
     tokens = json.loads(TOKENS_PATH.read_text(encoding="utf-8"))
     lines = [":root {"]
     for tok in tokens["color"]["tokens"]:
@@ -65,17 +75,25 @@ def tokens_css() -> str:
     return "\n".join(lines) + "\n"
 
 
-@lru_cache(maxsize=1)
 def page_css() -> str:
     """Everything the app needs: fonts @import first, then tokens, then component classes."""
+    return _page_css(_stamp(TOKENS_PATH, COMPONENTS_CSS_PATH))
+
+
+@lru_cache(maxsize=4)
+def _page_css(_stamp_key: tuple) -> str:
     components = COMPONENTS_CSS_PATH.read_text(encoding="utf-8")
     imports = [l for l in components.splitlines() if l.startswith("@import")]
     rest = "\n".join(l for l in components.splitlines() if not l.startswith("@import"))
     return "\n".join(imports) + "\n" + tokens_css() + rest
 
 
-@lru_cache(maxsize=1)
 def _tokens() -> dict:
+    return _tokens_cached(_stamp(TOKENS_PATH))
+
+
+@lru_cache(maxsize=4)
+def _tokens_cached(_stamp_key: tuple) -> dict:
     return json.loads(TOKENS_PATH.read_text(encoding="utf-8"))
 
 
