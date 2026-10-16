@@ -352,7 +352,7 @@ _ITEM_COLUMNS_ADDED = {"meats": "TEXT", "kcal": "REAL", "protein_g": "REAL",
 
 # Bump when FALLBACK_ITEMS/FALLBACK_* data in seed/load_seed.py changes, so existing
 # databases (including the deployed one) drop and reload their fallback rows.
-FALLBACK_DATA_VERSION = 3
+FALLBACK_DATA_VERSION = 4
 
 
 def _migrate_nullable_price(conn: sqlite3.Connection) -> None:

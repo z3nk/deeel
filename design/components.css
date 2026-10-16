@@ -513,8 +513,9 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
    sticker on the top result. Tokens only.
    ===================================================================== */
 
-/* Streamlit chrome we don't need (keep the header: it holds the sidebar toggle) */
-[data-testid="stToolbar"], .stAppDeployButton, [data-testid="stDecoration"] { display: none !important; }
+/* Streamlit chrome we don't need */
+/* Hide Deploy / menu / GitHub, but NOT the toolbar itself: Streamlit keeps the "open sidebar" button inside it */
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"], .stAppDeployButton, [data-testid="stDecoration"] { display: none !important; }
 [data-testid="stHeader"] { background: transparent; }
 .block-container { padding-top: var(--space-6); max-width: 1120px; }
 
