@@ -1,0 +1,249 @@
+DEEELICIOUS — BRAND KIT AND STYLE SHEET FOR CANVA
+For pitch decks, social posts, posters and other marketing.
+Source: design/tokens.json and design/README.md in the Deeelicious repo. If anything here disagrees with those files, they win.
+
+
+====================================================================
+QUICK PROMPT (paste this first into Canva AI)
+====================================================================
+
+Design for "Deeelicious", a student app that finds the best lunch (main + snack + drink) at six shops near UCL Bloomsbury and scores every basket 0-100 with the "Deeel score". The style is "Snack hype": loud, bold, sticker-heavy and fun, built on one deep green brand colour with sunshine yellow, electric violet and cyan accents on an off-white background. Headlines in Bricolage Grotesque ExtraBold, body text in Figtree. Stickers have a thick dark outline, a hard offset shadow with no blur, and a slight tilt. Lead with real numbers (prices, minutes, scores). No pink, no red except for allergy warnings, no gradients, no stock photos of people, no supermarket logos, no UCL branding.
+
+
+====================================================================
+1. WHAT DEEELICIOUS IS
+====================================================================
+
+- One line: Deeelicious finds your best lunch near UCL Bloomsbury: the best main + snack + drink, meal deal against buying separately, ranked out of 100.
+- Who uses it: students, on a phone, standing in a shop, deciding in under 30 seconds.
+- The shops: Tesco, Sainsbury's, Waitrose, M&S, Lidl and Pret near UCL Bloomsbury.
+- The Deeel score (0-100) weighs: value 30%, fillingness 25%, ingredient quality 25%, nutrition balance 10%, deal saving 10%.
+- The data comes from shelf photos students take in the shops. Students earn credits for photos, paid only once the team approves them.
+- Allergy and diet filters use the printed label text. Anything the label doesn't show counts as unsafe.
+
+
+====================================================================
+2. NAME AND SPELLING
+====================================================================
+
+- The name is Deeelicious: three Es, one word, capital D.
+- Never write it "Delicious", "Deelicious" or "DEEELICIOUS" (all caps is fine only as a deliberate headline graphic, never in sentences).
+- The score is the "Deeel score": capital D, lowercase "score".
+
+
+====================================================================
+3. THE TWO MODES: HYPE AND SERIOUS
+====================================================================
+
+Decide which mode every element is in before styling it.
+
+HYPE MODE (the default for marketing)
+- For headlines, prices, savings, the Deeel score, credits and rewards.
+- Use the display font, the accent colours, chunky stickers with a 2px dark outline, a hard offset shadow and a slight tilt (about 3 to 6 degrees).
+
+SERIOUS MODE
+- For allergy info, "sample data" labels and the Open Food Facts credit.
+- Use the body font (Figtree) only, plain text colours, thin hairline borders.
+- No stickers, no accent colours, no tilt, no jokes.
+- Never put hype styling on a safety message, even when it sits inside a hype layout.
+
+
+====================================================================
+4. COLOUR PALETTE
+====================================================================
+
+Add these to the Canva Brand Kit.
+
+BRAND
+- Deeel Green (primary) .............. #0F7B5F
+  The brand anchor. Main buttons, CTAs, "Best match" badges, key shapes. Put white text on it.
+- Green Tint ......................... #E7F2EE
+  Soft green panel or card background. Dark text on it.
+
+HYPE ACCENTS (marketing and fun bits only)
+- Sunshine Yellow .................... #FFD23F
+  Savings stickers ("Meal deal saves £1.70"), credits, attention blocks. DARK TEXT ONLY, never white.
+- Electric Violet .................... #7B2FF7
+  Deeel score graphics, stickers, poster blocks. White text on it.
+- Cyan ............................... #00C2FF
+  Stickers and marketing blocks. DARK TEXT ONLY, never white.
+
+NEUTRALS
+- Off-white (page background) ........ #F7F7F4
+- White (cards, surfaces) ............ #FFFFFF
+- Ink (main text, outlines, shadows) . #1F2328
+- Muted grey (secondary text) ........ #6B7280  (only on white or off-white)
+- Hairline border .................... #E3E3DE  (decorative lines only)
+- Strong outline ..................... #8A8F98
+
+DEEEL SCORE BANDS (score badge colour, always with the number on it)
+- Score 70+ .......................... #15803D  white text
+- Score 50-69 ........................ #B45309  white text
+- Score under 50 ..................... #64748B  white text
+
+SAFETY (serious mode only)
+- Allergy red (fill) ................. #DC2626  white text
+- Allergy red (text) ................. #B91C1C
+- Allergy warning background ......... #FEF2F2
+- Sample-data grey text .............. #475569 on #F1F5F9
+
+COLOUR RULES
+- The brand palette has no pinks or reds. Red appears ONLY for allergy warnings and errors, so it always means something.
+- Yellow and cyan always take dark ink text (#1F2328). Green and violet take white.
+- Never use colour as the only signal: a score badge shows the number, a rank shows the number, a warning shows words.
+- Flat colour only. No gradients, no glows, no neon effects.
+- Light backgrounds only. There is no dark theme.
+- Good combinations: green + yellow, violet + yellow, cyan + ink, off-white background with one or two accent blocks. Don't use all three accents at equal weight in one design; pick one lead accent.
+
+
+====================================================================
+5. TYPOGRAPHY
+====================================================================
+
+Two fonts, both free Google Fonts (both are in Canva's font library; upload them to the Brand Kit if not).
+
+DISPLAY: Bricolage Grotesque (weights 600 to 800)
+- For headlines, big prices and the big score numbers.
+- Headlines: ExtraBold (800), tight letter spacing (about -2%), line height about 1.0.
+
+BODY: Figtree (Regular 400, SemiBold 600, Bold 700)
+- For everything else: subheads, body text, labels, buttons, captions, and ALL safety text.
+
+TYPE SCALE (app sizes; scale up proportionally for posters and slides)
+- Marketing headline ... Bricolage Grotesque 800, 56px, line height 1.0, -2% spacing
+- Big score number ..... Bricolage Grotesque 800, 40px
+- Screen title ......... Bricolage Grotesque 800, 28px
+- Section heading ...... Bricolage Grotesque 700, 20px
+- Big price ............ Bricolage Grotesque 700, 28px
+- Card heading ......... Figtree 700, 16px
+- Body ................. Figtree 400, 14px
+- Body emphasis ........ Figtree 600, 14px
+- Label / button / chip  Figtree 600, 13px
+- Caption / credit ..... Figtree 400, 12px
+- Small badge .......... Figtree 600, 11px (the smallest size, never smaller)
+
+TYPE RULES
+- Sentence case everywhere ("Find my lunch", not "Find My Lunch").
+- Prices and scores should line up (tabular figures) where they sit in columns.
+- Headlines in ink (#1F2328) or Deeel Green on light backgrounds, white on green or violet, ink on yellow or cyan.
+
+
+====================================================================
+6. SHAPES, SPACING AND EFFECTS
+====================================================================
+
+CORNERS
+- Pills, chips, badges, score badge: fully rounded (pill shape).
+- Buttons and boxes: 8px radius.
+- Cards and panels: 12px radius.
+- Small badges and thumbnails: 6px radius.
+
+SPACING
+- Use a 4-point grid: 4, 8, 12, 16, 24, 32px.
+- Marketing layouts use generous margins (32px at app scale; scale up for print).
+
+EFFECTS
+- Sticker look (hype mode only): solid fill, 2px outline in ink #1F2328, hard drop shadow offset 3px right and 3px down in #1F2328 with NO blur, tilted 3 to 6 degrees.
+- Cards: thin 1px border in #E3E3DE, no shadow. The featured card has a 2px Deeel Green border on the Green Tint background.
+- At most two levels of depth. No soft blurry shadows, no glassmorphism, no 3D.
+
+
+====================================================================
+7. LOGO
+====================================================================
+
+- A teammate is designing the logo. Don't let Canva AI generate or approximate one.
+- Until it's ready, use the wordmark "Deeelicious" typed in Bricolage Grotesque ExtraBold (800), in ink or Deeel Green on off-white/white, or in white on Deeel Green.
+- Leave a logo slot in every layout.
+- Clear space: at least 32px (at app scale) on all sides in marketing.
+- Minimum height: 20px on screen.
+- Place it only on off-white, white, Deeel Green or Sunshine Yellow. Never over photos or patterns.
+
+
+====================================================================
+8. IMAGERY AND ICONS
+====================================================================
+
+- Use real shelf photos taken by the team in the shops. Avoid stock food photos.
+- No photos of people's faces.
+- Illustration is fine for small accents only (doodles, arrows, sparkles around stickers).
+- Icons: simple line icons, ink colour, consistent stroke. Useful ones: walking minutes, hot/cold, meal deal, loyalty card, camera, credits/coins, map pin, barcode, warning.
+- App screenshots go inside a phone frame (and a laptop frame for desktop shots).
+
+
+====================================================================
+9. VOICE AND COPY
+====================================================================
+
+- Lead with numbers. Plain words. Talk to the reader as "you".
+- Playful about lunch. Never playful about allergies, health, or guaranteed prices.
+
+WRITE THIS / NOT THIS
+- "£3.85 at Tesco · 4 min" ............ not "We found a great option for you!"
+- "Meal deal saves £1.70" ............. not "Amazing savings!!"
+- "Nothing under £4 within 5 min. Try 10 min?" ... not "No results found."
+- "+10 credits once approved" ......... not "You've earned 10 credits!"
+- "Best basket" ....................... not "optimised result"
+
+HEADLINES YOU CAN USE
+- "Your meal deal, but with maths."
+- "£3.85 or £5.55? We checked the shelf."
+- "Lunch ranked out of 100. Meet the Deeel score."
+- "Six shops. Ten minutes. One best lunch."
+- "Snap a shelf, earn credits."
+- "Allergy-aware lunch finding — and we'll always tell you to check the pack."
+
+CTA BUTTON TEXT
+- "Find my lunch"
+
+
+====================================================================
+10. HARD RULES (every asset)
+====================================================================
+
+1. No supermarket logos in marketing. Shop names in plain text are fine.
+2. No UCL or Students' Union logos, crests, colours or names used as branding, and nothing that implies a partnership. "Near UCL Bloomsbury" as a location is fine.
+3. Never claim "always the cheapest", "allergen-safe", "allergy-proof" or anything similar.
+4. Any mention of allergens carries the warning: "⚠️ computer-read — check the pack". Serious mode, never shrunk, faded or hidden.
+5. Sponsor and rewards content stays visibly separate from rankings, with the line "Sponsors never affect ranking".
+6. Credits are only "earned" once approved. Say "once approved".
+7. If nutrition data is shown, credit it in small text: "Some nutrition data from Open Food Facts".
+8. Contrast: body text needs at least 4.5:1 against its background, large text and icons at least 3:1. Stick to the colour pairings in section 4.
+
+
+====================================================================
+11. FORMATS TO MAKE
+====================================================================
+
+PITCH DECK (16:9, 1920x1080)
+- Slides: Title · Problem · Demo screenshot · How the Deeel score works · Data and trust · Team.
+- Title slide: off-white or Deeel Green background, big wordmark, one headline, one accent sticker.
+- Deeel score slide: big score numeral in a violet or green badge, with the five weights (value 30, fillingness 25, ingredient quality 25, nutrition balance 10, deal saving 10) as a simple bar or list.
+- Data and trust slide: serious mode. Shelf photos, label-only allergy data, "unknown counts as unsafe", team review before credits pay out, Open Food Facts credit.
+- One idea per slide, big numbers, lots of off-white space.
+
+INSTAGRAM POST (1080x1080) AND STORY (1080x1920)
+- "Meal deal vs separate": two prices side by side, the winner in a yellow savings sticker.
+- "Deeel of the day": one lunch result card (shop, three items, price, walk time, Deeel score badge).
+- "New shop photographed".
+- "Earn credits": "Snap a shelf, earn credits." with a camera icon. Include "once approved".
+- Rewards / sponsor: "Spend your credits on…" with a clearly separate sponsor logo slot and "Sponsors never affect ranking".
+
+A3 CAMPUS POSTER (297x420mm)
+- One huge headline, one example result card or price comparison, QR code to the live app, the wordmark, "Find my lunch".
+
+LANDING PAGE HERO (desktop and mobile)
+- Headline, one-line sub, phone screenshot, "Find my lunch" button in Deeel Green with white text.
+
+
+====================================================================
+12. EXAMPLE RESULT CARD (for mockups)
+====================================================================
+
+- White card, 12px corners, thin grey border (featured version: Green Tint background, 2px green border, "Best match" pill in green with white text).
+- Shop name in Figtree Bold, e.g. "Tesco Express · 4 min".
+- Basket line in Figtree Regular: "Chicken wrap + Sea Salt crisps + Coke Zero".
+- Big price in Bricolage Grotesque Bold: "£3.85".
+- Yellow savings sticker, tilted, ink outline and hard shadow: "Meal deal saves £1.70".
+- Deeel score badge: green pill with white number, e.g. "79".
+- Allergen line in serious mode underneath, in allergy-red text: "Contains: milk, wheat · ⚠️ computer-read — check the pack".
