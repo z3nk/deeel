@@ -143,9 +143,9 @@ def _ensure_user():
 ALLERGENS = ["Gluten", "Milk", "Egg", "Nuts", "Sesame", "Soy", "Fish", "Shellfish"]
 
 # Shown wherever allergen data appears
-ALLERGY_WARNING_SHORT = "⚠️ computer-read — check the pack"
+ALLERGY_WARNING_SHORT = "Computer-read — check the pack"
 ALLERGY_WARNING = (
-    "⚠️ **Allergen information is read by computer** — from our photos of shelf labels and, "
+    "**Allergen information is read by computer** — from our photos of shelf labels and, "
     "where a photo didn't show it, from online data (Open Food Facts). It can be wrong or "
     "incomplete. **Always check the packaging yourself before eating.**"
 )
@@ -353,12 +353,12 @@ def _freshness_badge(last_seen_str: str) -> str:
     except Exception:
         return ""
     if days > 14:
-        return f'<span class="dl-badge dl-badge--stale">● Seen {days}d ago</span>'
+        return f'<span class="dl-badge dl-badge--stale">Seen {days}d ago</span>'
     if days > 7:
-        return f'<span class="dl-badge dl-badge--ageing">● Seen {days}d ago</span>'
+        return f'<span class="dl-badge dl-badge--ageing">Seen {days}d ago</span>'
     if days == 0:
-        return '<span class="dl-badge dl-badge--fresh">● Seen today</span>'
-    return f'<span class="dl-badge dl-badge--fresh">● Seen {days}d ago</span>'
+        return '<span class="dl-badge dl-badge--fresh">Seen today</span>'
+    return f'<span class="dl-badge dl-badge--fresh">Seen {days}d ago</span>'
 
 
 def _allergen_line(items_list, avoid: list[str]) -> str:
@@ -477,14 +477,16 @@ def _allergen_line_html(items_list, warn: bool = False) -> str:
     return f'<div class="dl-allergen-line dl-card__note">{escape(text)}{warning}</div>'
 
 
-def _deal_html(lunch, prefs: Preferences | None = None) -> str:
+def _deal_html(lunch, prefs: Preferences | None = None, sticker: bool = False) -> str:
     """Deal state for the price row. The savings sticker is the only hype element on the card."""
     sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink], prefs)
     if lunch.used_deal and sep_price is None:
         return '<span class="dl-plain-deal">Meal deal — some items are only priced as part of the deal</span>'
     if lunch.used_deal and sep_price > lunch.price_gbp:
-        return (f'<span class="dl-card__strike">£{sep_price:.2f} separately</span>'
-                f'<span class="dl-sticker">Meal deal saves £{sep_price - lunch.price_gbp:.2f}</span>')
+        saving = f"Meal deal saves £{sep_price - lunch.price_gbp:.2f}"
+        saving_html = (f'<span class="dl-sticker">{saving}</span>' if sticker
+                       else f'<span class="dl-plain-deal dl-plain-deal--save">{saving}</span>')
+        return f'<span class="dl-card__strike">£{sep_price:.2f} separately</span>{saving_html}'
     return '<span class="dl-plain-deal">Bought separately — no deal</span>'
 
 
@@ -505,8 +507,6 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
                    f'aria-label="Rank {rank}">{rank}</span>')
     top.append(logo_html(lunch.shop))
     top.append(f'<span class="dl-card__name">{escape(lunch.shop.name)}</span>')
-    if featured:
-        top.append('<span class="dl-badge dl-badge--best">Best match</span>')
     if sample:
         top.append('<span class="dl-badge dl-badge--sample">Sample data</span>')
     is_open = is_shop_open(lunch.shop.shop_id)
@@ -539,7 +539,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
 
     price_cls = "dl-card__price" if featured else "dl-card__price dl-card__price--sm"
     body.append(f'<div class="dl-card__price-row"><span class="{price_cls}">£{lunch.price_gbp:.2f}</span>'
-                f'{_deal_html(lunch, prefs)}{fresh}</div>')
+                f'{_deal_html(lunch, prefs, sticker=featured)}{fresh}</div>')
 
     card_cls = "dl-card dl-card--in-st" + (" dl-card--featured" if featured else "")
     with st.container(border=True):
@@ -580,8 +580,7 @@ def screen_find(prefs: Preferences):
         '<div class="dl-hero__title" role="heading" aria-level="1">A deeel for you</div>'
         '<p class="dl-hero__sub">The best main, snack and drink near campus, ranked out of 100.</p></div>'
         '<div class="dl-hero__art" aria-hidden="true">'
-        f'<img class="dl-hero__icon" alt="" src="data:image/png;base64,{_splash_logo_b64()}">'
-        '<span class="dl-sticker dl-hero__sticker">Meal deal vs separate, checked</span></div></div>',
+        f'<img class="dl-hero__icon" alt="" src="data:image/png;base64,{_splash_logo_b64()}"></div></div>',
         unsafe_allow_html=True,
     )
     list_tab, map_tab = st.tabs(["List view", "Map view"])
@@ -794,7 +793,7 @@ def screen_find(prefs: Preferences):
                         if sel_lunch:
                             st.markdown(f"### £{sel_lunch.price_gbp:.2f}")
                             deal_str = "Meal deal" if sel_lunch.used_deal else "Bought separately"
-                            st.caption(f"✅ {deal_str}")
+                            st.caption(deal_str)
                     with mcol3:
                         if st.button("View basket →", key=f"map_see_basket_{sel_shop.shop_id}"):
                             st.session_state["detail_shop_id"] = sel_shop.shop_id
@@ -853,7 +852,7 @@ def _item_info_html(item, prefs: Preferences | None = None) -> str:
     """Name, price, tags, allergens, nutrition and freshness under a shop-page picker."""
     tags = []
     if item.temperature == "hot":
-        tags.append('<span class="dl-item__meta">🔥 hot</span>')
+        tags.append('<span class="dl-item__meta">hot</span>')
     if item.meal_deal_eligible is False:
         tags.append('<span class="dl-item__meta">not in deal</span>')
     if item.status == "pending":
@@ -886,9 +885,9 @@ def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: boo
         note = ""
         if is_deal_better and sep_price is not None:
             note = (f'<div class="dl-compare__note dl-compare__note--win">'
-                    f'✓ Best option — saves £{sep_price - price:.2f}</div>')
+                    f'Best option — saves £{sep_price - price:.2f}</div>')
         elif is_deal_better:
-            note = '<div class="dl-compare__note dl-compare__note--win">✓ Best option</div>'
+            note = '<div class="dl-compare__note dl-compare__note--win">Best option</div>'
         deal_body = f'<div class="dl-compare__price">£{price:.2f}</div>{card_note}{note}'
 
     sep_win = not is_deal_better and sep_price is not None
@@ -898,7 +897,7 @@ def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: boo
     else:
         sep_body = f'<div class="dl-compare__price">£{sep_price:.2f}</div>'
         if sep_win:
-            sep_body += '<div class="dl-compare__note dl-compare__note--win">✓ Best option</div>'
+            sep_body += '<div class="dl-compare__note dl-compare__note--win">Best option</div>'
 
     deal_cls = "dl-compare__opt is-winner" if is_deal_better else "dl-compare__opt"
     sep_cls = "dl-compare__opt is-winner" if sep_win else "dl-compare__opt"
@@ -1037,7 +1036,7 @@ def screen_detail(prefs: Preferences | None = None):
     for item in filtered:
         tags = [item.category]
         if item.temperature == "hot":
-            tags.append("🔥 hot")
+            tags.append("hot")
         if item.meal_deal_eligible is False:
             tags.append("not in deal")
         unverified = (' <span class="dl-badge dl-badge--unverified">Unverified</span>'
@@ -1410,7 +1409,7 @@ def screen_upload():
                     unsafe_allow_html=True,
                 )
                 if is_done:
-                    st.markdown('<span class="dl-done">Done ✓</span>', unsafe_allow_html=True)
+                    st.markdown('<span class="dl-done">Done</span>', unsafe_allow_html=True)
                 elif is_active:
                     st.caption("Upload above ↑")
                 else:
