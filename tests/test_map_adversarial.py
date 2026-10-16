@@ -87,7 +87,7 @@ def test_empty_ranked_lunches():
     m = build_map(ranked_lunches=[], all_shops=shops)
     rendered = m.get_root().render()
 
-    assert "basemaps.cartocdn.com/light_all" in rendered
+    assert "tile.openstreetmap.org" in rendered
     # Every shop should be marked "Outside your filters"
     assert rendered.count("Outside your filters") == len(shops)
     # No star badge or rank number badges
@@ -98,7 +98,7 @@ def test_empty_ranked_lunches():
 def test_empty_ranked_and_empty_shops():
     m = build_map(ranked_lunches=[], all_shops=[])
     rendered = m.get_root().render()
-    assert "basemaps.cartocdn.com/light_all" in rendered
+    assert "tile.openstreetmap.org" in rendered
     assert "You are here" in rendered
 
 

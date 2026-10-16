@@ -37,6 +37,8 @@ COLOUR_RANK2 = token("rank-2")     # yellow
 COLOUR_RANK3 = token("rank-3")     # orange
 COLOUR_GREY  = token("rank-out")   # out of range / filtered
 
+OSM_TILES_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+OSM_TILES_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 CARTO_TILES_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
 CARTO_TILES_ATTR = (
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
@@ -74,7 +76,10 @@ def get_carto_tiles_url() -> str:
         clean_key = api_key.strip()
         delim = "&" if "?" in base_url else "?"
         return f"{base_url}{delim}key={clean_key}"
-    return base_url
+    if custom_url or os.environ.get("CARTO_TILES_URL"):
+        return base_url
+    # CARTO's basemap shows an "API KEY REQUIRED" watermark without a key: use OpenStreetMap
+    return OSM_TILES_URL
 
 
 def _rank_colour(rank: int) -> str:
@@ -177,8 +182,12 @@ def build_map(
         location=[campus_lat, campus_lng],
         zoom_start=15,
         tiles=get_carto_tiles_url(),
-        attr=CARTO_TILES_ATTR,
+        attr=OSM_TILES_ATTR if get_carto_tiles_url() == OSM_TILES_URL else CARTO_TILES_ATTR,
     )
+    if get_carto_tiles_url() == OSM_TILES_URL:
+        # soften OpenStreetMap's colours so the map sits quietly behind the shop pins
+        m.get_root().header.add_child(folium.Element(
+            "<style>.leaflet-tile-pane { filter: grayscale(0.7) sepia(0.12) brightness(1.04) contrast(0.92); }</style>"))
 
     # ── Injected tokenized popup styling and cross-iframe navigation script ──
     t_surface = token("surface")

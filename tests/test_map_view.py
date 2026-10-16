@@ -5,7 +5,7 @@ import folium
 from streamlit.testing.v1 import AppTest
 
 from db import fetch_all_shops, fetch_approved_deals, fetch_approved_items, get_connection
-from map_view import build_map, get_carto_tiles_url, CARTO_TILES_URL
+from map_view import build_map, get_carto_tiles_url, CARTO_TILES_URL, OSM_TILES_URL
 from models import Preferences
 from optimiser import _row_to_deal, _row_to_item, _row_to_shop, get_results
 from shop_images import logo_data_uri
@@ -16,7 +16,7 @@ ROOT = Path(__file__).parent.parent
 def test_get_carto_tiles_url(monkeypatch):
     monkeypatch.delenv("CARTO_API_KEY", raising=False)
     monkeypatch.delenv("CARTO_TILES_URL", raising=False)
-    assert get_carto_tiles_url() == CARTO_TILES_URL
+    assert get_carto_tiles_url() == OSM_TILES_URL      # no key: OpenStreetMap, no watermark
 
     monkeypatch.setenv("CARTO_API_KEY", "carto-test-key-1234")
     assert get_carto_tiles_url() == f"{CARTO_TILES_URL}?key=carto-test-key-1234"
@@ -45,8 +45,8 @@ def test_build_map_cartodb_tiles_and_logo_pins():
     rendered = m.get_root().render()
 
     # 1. Base tiles check
-    assert "basemaps.cartocdn.com/light_all" in rendered
-    assert "CARTO" in rendered
+    assert "tile.openstreetmap.org" in rendered       # no CARTO key set
+    assert "OpenStreetMap" in rendered
 
     # 2. Shop logos check
     assert "data:image/svg+xml;base64," in rendered
@@ -109,3 +109,10 @@ def test_query_param_navigation():
     assert at.session_state["screen"] == "detail"
     assert at.session_state["detail_shop_id"] == "tesco-tcr"
     assert "shop" not in at.query_params
+
+
+def test_build_map_uses_carto_only_with_a_key(monkeypatch):
+    monkeypatch.setenv("CARTO_API_KEY", "carto-test-key-1234")
+    rendered = build_map(ranked_lunches=[], all_shops=[]).get_root().render()
+    assert "basemaps.cartocdn.com/light_all" in rendered and "key=carto-test-key-1234" in rendered
+    assert "CARTO" in rendered

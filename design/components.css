@@ -507,3 +507,116 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
   .dl-splash { animation-duration: 0.01s; animation-delay: 0.5s; }
   .dl-splash img { animation: none; }
 }
+
+/* =====================================================================
+   Polish layer: hero, cards, nav, tabs, motion. Tokens only.
+   ===================================================================== */
+
+/* Streamlit chrome we don't need (keep the header: it holds the sidebar toggle) */
+[data-testid="stToolbar"], .stAppDeployButton, [data-testid="stDecoration"] { display: none !important; }
+[data-testid="stHeader"] { background: transparent; }
+.block-container { padding-top: var(--space-6); max-width: 1120px; }
+
+/* ---------- Hero ---------- */
+.dl-hero { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: var(--space-6);
+  background: var(--logo-green); color: var(--on-primary); border-radius: 20px; padding: var(--space-6) var(--space-8); margin: var(--space-2) 0 var(--space-4);
+  box-shadow: 6px 6px 0 var(--text); }
+.dl-hero::before { content: ""; position: absolute; right: -60px; bottom: -90px; width: 300px; height: 300px; border-radius: 999px; background: var(--logo-leaf); }
+.dl-hero::after { content: ""; position: absolute; right: 190px; top: -46px; width: 120px; height: 120px; border-radius: 999px; background: var(--accent-yellow); opacity: 0.95; }
+.dl-hero__copy { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--space-2); max-width: 560px; }
+.dl-hero__title { font-family: var(--font-display); font-weight: 800; font-size: 52px; line-height: 52px; letter-spacing: -0.02em; margin: 0; color: var(--on-primary); }
+.dl-hero__sub { margin: 0; font-family: var(--font-ui); font-size: 18px; line-height: 26px; color: var(--on-primary); }
+.dl-hero__art { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: var(--space-3); margin-right: var(--space-4); }
+.dl-hero__icon { width: 104px; height: 104px; border-radius: 24px; border: var(--border-width-strong) solid var(--text); box-shadow: var(--shadow-sticker); transform: rotate(-6deg); }
+.dl-hero__sticker { transform: rotate(3deg); font-size: 13px; line-height: 16px; white-space: nowrap; }
+@media (max-width: 640px) {
+  .dl-hero { padding: var(--space-4); box-shadow: 4px 4px 0 var(--text); }
+  .dl-hero__title { font-size: 34px; line-height: 36px; }
+  .dl-hero__sub { font-size: 14px; line-height: 20px; }
+  .dl-hero__art { display: none; }
+  .dl-hero::before { right: -90px; bottom: -120px; }
+  .dl-hero::after { right: 30px; top: -64px; }
+}
+
+/* ---------- Nav pills ---------- */
+.st-key-dl_nav button { border-radius: var(--radius-chip); font-weight: 700; border: var(--border-width-hairline) solid var(--border-strong);
+  background: var(--surface); transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.st-key-dl_nav button:hover { transform: translateY(-1px); border-color: var(--primary); }
+.st-key-dl_nav button[kind="primary"] { background: var(--logo-green); border-color: var(--text); color: var(--on-primary); box-shadow: 3px 3px 0 var(--accent-yellow); }
+.st-key-dl_nav button[kind="primary"] p { color: var(--on-primary); }
+.st-key-dl_nav button p { font-family: var(--font-ui); font-size: 14px; }
+
+/* ---------- Tabs (List / Map) ---------- */
+button[data-baseweb="tab"] { font-family: var(--font-ui); font-weight: 700; }
+button[data-baseweb="tab"][aria-selected="true"] { color: var(--logo-green); }
+button[data-baseweb="tab"][aria-selected="true"] p { color: var(--logo-green); }
+[data-baseweb="tab-highlight"] { background-color: var(--logo-leaf) !important; height: 4px !important; border-radius: 999px; }
+
+/* ---------- Section titles: marker highlight ---------- */
+.dl-section-title { display: inline-block; font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 30px; letter-spacing: -0.01em;
+  background: linear-gradient(transparent 62%, var(--accent-yellow) 62%, var(--accent-yellow) 92%, transparent 92%); padding: 0 var(--space-1); margin-left: calc(var(--space-1) * -1); }
+
+/* ---------- Result cards ---------- */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card),
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card) { border-radius: 16px; background: var(--surface); border-color: var(--border);
+  transition: transform 0.15s ease, box-shadow 0.15s ease; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card):hover,
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card):hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31, 35, 40, 0.10); }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card--featured),
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card--featured) { background: var(--primary-tint); border: var(--border-width-strong) solid var(--logo-green);
+  box-shadow: 6px 6px 0 var(--logo-green); }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card--featured):hover,
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card--featured):hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--logo-green); }
+.dl-card--featured .dl-card__price { font-size: 44px; line-height: 48px; font-weight: 800; color: var(--logo-green); }
+.dl-card__name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.dl-card--featured .dl-card__name { font-size: 22px; line-height: 28px; }
+
+/* Basket: main + snack + drink as labelled chips */
+.dl-basket { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0 var(--space-2); }
+.dl-basket__item { display: inline-flex; align-items: baseline; gap: var(--space-2); background: var(--bg); border-radius: var(--radius-button);
+  padding: var(--space-1) var(--space-3); font-size: 14px; line-height: 20px; font-weight: 600; color: var(--text); }
+.dl-card--featured .dl-basket__item { background: var(--surface); }
+.dl-basket__label { font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+
+/* The top result's score: a violet sticker (rank 1 only; the number carries the meaning) */
+[class*="dl_card_actions"][class*="_1_high"] [data-testid="stPopover"] button,
+[class*="dl_card_actions"][class*="_1_mid"] [data-testid="stPopover"] button,
+[class*="dl_card_actions"][class*="_1_low"] [data-testid="stPopover"] button {
+  background: var(--accent-violet) !important; color: var(--on-primary) !important; border: var(--border-width-strong) solid var(--text) !important;
+  box-shadow: 3px 3px 0 var(--text) !important; font-size: 14px !important; padding: 6px 16px !important; transform: rotate(-2deg);
+}
+[class*="dl_card_actions"][class*="_1_"] [data-testid="stPopover"] button p { font-family: var(--font-display) !important; font-weight: 800 !important; font-size: 15px !important; }
+
+/* ---------- Controls: friendlier focus and motion ---------- */
+.stButton > button { transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease; }
+.stButton > button:focus-visible, [data-baseweb="select"] > div:focus-within { outline: 2px solid var(--text); outline-offset: 2px; }
+[data-testid="stSidebar"] { border-right: var(--border-width-hairline) solid var(--border); }
+[data-testid="stSidebar"] .dl-chip-heading { font-family: var(--font-display); font-size: 15px; }
+[data-testid="stCaptionContainer"] p { color: var(--text); }
+iframe { border-radius: 16px; }
+
+/* ---------- Motion: cards rise in ---------- */
+@keyframes dl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card), [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card), .dl-hero { animation: dl-rise 0.4s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card), [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card), .dl-hero { animation: none; }
+  .st-key-dl_nav button, [data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card),
+[data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card) { transition: none; }
+}
+
+@media (max-width: 640px) {
+  /* keep the title on plain green: small lime corner, no yellow disc */
+  .dl-hero::before { width: 150px; height: 150px; right: -50px; bottom: -70px; }
+  .dl-hero::after { display: none; }
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.dl-card--featured),
+  [data-testid="stVerticalBlock"]:has(> [data-testid="stElementContainer"] .dl-card--featured) { box-shadow: 3px 3px 0 var(--logo-green); }
+}
+
+@media (max-width: 640px) {
+  .dl-hero::before { width: 110px; height: 110px; right: -50px; bottom: -64px; }
+}
+/* Screen titles in the logo green; info boxes in the brand's soft green instead of default blue */
+.dl-type-h1 { color: var(--logo-green); }
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) { background: var(--primary-tint); border: var(--border-width-hairline) solid var(--border); border-radius: 12px; }
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) p { color: var(--text); }
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) [data-testid="stAlertContainer"] { background: transparent; }

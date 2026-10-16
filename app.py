@@ -519,7 +519,11 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
     top.append(f'<span class="dl-card__walk">{lunch.shop.walking_minutes:.0f} min walk</span>')
 
     body = [f'<div class="dl-card__top">{"".join(top)}</div>']
-    body.append(f'<div class="dl-card__basket">{escape(" + ".join(i.name for i in trio))}</div>')
+    basket = "".join(
+        f'<span class="dl-basket__item"><span class="dl-basket__label">{label}</span>{escape(i.name)}</span>'
+        for label, i in zip(("Main", "Snack", "Drink"), trio)
+    )
+    body.append(f'<div class="dl-basket">{basket}</div>')
     nutrition = _nutrition_line(trio)
     if nutrition:
         body.append(f'<div class="dl-card__meta">{escape(nutrition)}</div>')
@@ -571,7 +575,15 @@ def screen_find(prefs: Preferences):
     sort_map = {"Deeel score": "deeel", "Quality": "quality", "Distance": "distance", "Price (low to high)": "price"}
     primary, alternatives, other_shops = get_results(shops, items, deals, prefs)
 
-    st.markdown('<h1 class="dl-type-h1 dl-find-title">A deeel for you</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="dl-hero"><div class="dl-hero__copy">'
+        '<div class="dl-hero__title" role="heading" aria-level="1">A deeel for you</div>'
+        '<p class="dl-hero__sub">The best main, snack and drink near campus, ranked out of 100.</p></div>'
+        '<div class="dl-hero__art" aria-hidden="true">'
+        f'<img class="dl-hero__icon" alt="" src="data:image/png;base64,{_splash_logo_b64()}">'
+        '<span class="dl-sticker dl-hero__sticker">Meal deal vs separate, checked</span></div></div>',
+        unsafe_allow_html=True,
+    )
     list_tab, map_tab = st.tabs(["List view", "Map view"])
 
     with list_tab:
