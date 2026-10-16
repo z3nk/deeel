@@ -724,7 +724,7 @@ def screen_find(prefs: Preferences):
         st.caption(f"{len(map_shops)} shops{map_open_suffix} shown on map")
         map_data = st_folium(
             fmap,
-            width=900,
+            use_container_width=True,   # fills the same column as the hero and cards
             height=500,
             returned_objects=["last_object_clicked", "last_object_clicked_tooltip", "last_object_clicked_popup"],
         )
