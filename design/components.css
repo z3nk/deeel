@@ -586,7 +586,7 @@ button[data-baseweb="tab"][aria-selected="true"], button[data-baseweb="tab"][ari
 [data-testid="stSidebar"] { border-right: var(--border-width-hairline) solid var(--border); }
 [data-testid="stSidebar"] .dl-chip-heading { font-family: var(--font-display); font-size: 15px; }
 [data-testid="stCaptionContainer"] p { color: var(--text); }
-iframe { border-radius: 12px; }
+iframe { border-radius: 12px; border: var(--border-width-hairline) solid var(--border); }
 
 /* Screen titles in the logo green; info boxes in the brand's soft green */
 .dl-type-h1 { color: var(--logo-green); }

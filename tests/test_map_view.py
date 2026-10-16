@@ -10,10 +10,13 @@ from models import Preferences
 from optimiser import _row_to_deal, _row_to_item, _row_to_shop, get_results
 from shop_images import logo_data_uri
 
+import streamlit as st
+
 ROOT = Path(__file__).parent.parent
 
 
 def test_get_carto_tiles_url(monkeypatch):
+    monkeypatch.setattr(st, "secrets", {}, raising=False)
     monkeypatch.delenv("CARTO_API_KEY", raising=False)
     monkeypatch.delenv("CARTO_TILES_URL", raising=False)
     assert get_carto_tiles_url() == OSM_TILES_URL      # no key: OpenStreetMap, no watermark
@@ -33,7 +36,10 @@ def test_logo_data_uri():
     assert logo_data_uri("unknown_chain") is None
 
 
-def test_build_map_cartodb_tiles_and_logo_pins():
+def test_build_map_cartodb_tiles_and_logo_pins(monkeypatch):
+    monkeypatch.setattr(st, "secrets", {}, raising=False)
+    monkeypatch.delenv("CARTO_API_KEY", raising=False)
+    monkeypatch.delenv("CARTO_TILES_URL", raising=False)
     conn = get_connection()
     shops = [_row_to_shop(r) for r in fetch_all_shops(conn)]
     items = [_row_to_item(r) for r in fetch_approved_items(conn)]
@@ -114,5 +120,16 @@ def test_query_param_navigation():
 def test_build_map_uses_carto_only_with_a_key(monkeypatch):
     monkeypatch.setenv("CARTO_API_KEY", "carto-test-key-1234")
     rendered = build_map(ranked_lunches=[], all_shops=[]).get_root().render()
-    assert "basemaps.cartocdn.com/light_all" in rendered and "key=carto-test-key-1234" in rendered
+    assert "basemaps.cartocdn.com/rastertiles/voyager" in rendered and "key=carto-test-key-1234" in rendered
     assert "CARTO" in rendered
+
+
+def test_map_theme_styling_and_origin_marker(monkeypatch):
+    monkeypatch.setenv("CARTO_API_KEY", "carto-test-key-1234")
+    rendered = build_map(ranked_lunches=[], all_shops=[]).get_root().render()
+    # Check theme color integration
+    assert "leaflet-container" in rendered
+    assert "mix-blend-mode: multiply" in rendered
+    assert "You are here (UCL Main Quad)" in rendered
+    assert "leaflet-bar" in rendered
+    assert "leaflet-control-attribution" in rendered

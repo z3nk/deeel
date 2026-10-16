@@ -39,7 +39,9 @@ COLOUR_GREY  = token("rank-out")   # out of range / filtered
 
 OSM_TILES_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 OSM_TILES_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-CARTO_TILES_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+CARTO_VOYAGER_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+CARTO_POSITRON_URL = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+CARTO_TILES_URL = CARTO_VOYAGER_URL
 CARTO_TILES_ATTR = (
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
     'contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
@@ -50,33 +52,34 @@ def get_carto_tiles_url() -> str:
     """
     Resolve the CARTO basemap tile URL.
 
-    Reads CARTO_API_KEY or CARTO_KEY from Streamlit secrets or environment (.env).
+    Reads CARTO_API_KEY or CARTO_KEY from environment (.env) or Streamlit secrets.
     CARTO basemaps requires '?key=<token>' query parameter.
     """
-    api_key = None
-    try:
-        api_key = (
-            st.secrets.get("CARTO_API_KEY")
-            or st.secrets.get("CARTO_KEY")
-            or st.secrets.get("carto_api_key")
-            or st.secrets.get("carto_key")
-        )
-    except Exception:
-        pass
-    api_key = api_key or os.environ.get("CARTO_API_KEY") or os.environ.get("CARTO_KEY")
+    api_key = os.environ.get("CARTO_API_KEY") or os.environ.get("CARTO_KEY")
+    if not api_key:
+        try:
+            api_key = (
+                st.secrets.get("CARTO_API_KEY")
+                or st.secrets.get("CARTO_KEY")
+                or st.secrets.get("carto_api_key")
+                or st.secrets.get("carto_key")
+            )
+        except Exception:
+            pass
 
-    custom_url = None
-    try:
-        custom_url = st.secrets.get("CARTO_TILES_URL")
-    except Exception:
-        pass
-    base_url = (custom_url or os.environ.get("CARTO_TILES_URL") or CARTO_TILES_URL).strip()
+    custom_url = os.environ.get("CARTO_TILES_URL")
+    if not custom_url:
+        try:
+            custom_url = st.secrets.get("CARTO_TILES_URL")
+        except Exception:
+            pass
+    base_url = (custom_url or CARTO_TILES_URL).strip()
 
     if api_key and api_key.strip():
         clean_key = api_key.strip()
         delim = "&" if "?" in base_url else "?"
         return f"{base_url}{delim}key={clean_key}"
-    if custom_url or os.environ.get("CARTO_TILES_URL"):
+    if custom_url:
         return base_url
     # CARTO's basemap shows an "API KEY REQUIRED" watermark without a key: use OpenStreetMap
     return OSM_TILES_URL
@@ -154,6 +157,24 @@ def _marker_icon_html(shop: Shop, rank: int | None = None) -> str:
     )
 
 
+def _campus_marker_icon_html() -> str:
+    """Generate HTML for the UCL Main Quad origin marker in Deeelicious brand colours."""
+    t_primary = token("primary")
+    t_surface = token("surface")
+    t_on_primary = token("on-primary")
+    t_radius_chip = token("radius-chip")
+    return (
+        f'<div style="position:relative;width:34px;height:34px;background:{t_primary};'
+        f'border:2.5px solid {t_surface};border-radius:{t_radius_chip};'
+        f'display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(15,123,95,0.45);'
+        f'cursor:pointer;box-sizing:border-box;" title="You are here (UCL Main Quad)">'
+        f'<svg viewBox="0 0 24 24" width="18" height="18" fill="{t_on_primary}">'
+        f'<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>'
+        f'</svg>'
+        f'</div>'
+    )
+
+
 def build_map(
     ranked_lunches: list[Lunch],
     all_shops: list[Shop],
@@ -178,18 +199,18 @@ def build_map(
         all_shops = [s for s in all_shops if is_shop_open(s.shop_id, now)]
         ranked_lunches = [l for l in ranked_lunches if is_shop_open(l.shop.shop_id, now)]
 
+    tiles_url = get_carto_tiles_url()
+    is_osm = (tiles_url == OSM_TILES_URL)
+
     m = folium.Map(
         location=[campus_lat, campus_lng],
         zoom_start=15,
-        tiles=get_carto_tiles_url(),
-        attr=OSM_TILES_ATTR if get_carto_tiles_url() == OSM_TILES_URL else CARTO_TILES_ATTR,
+        tiles=tiles_url,
+        attr=OSM_TILES_ATTR if is_osm else CARTO_TILES_ATTR,
     )
-    if get_carto_tiles_url() == OSM_TILES_URL:
-        # soften OpenStreetMap's colours so the map sits quietly behind the shop pins
-        m.get_root().header.add_child(folium.Element(
-            "<style>.leaflet-tile-pane { filter: grayscale(0.7) sepia(0.12) brightness(1.04) contrast(0.92); }</style>"))
 
-    # ── Injected tokenized popup styling and cross-iframe navigation script ──
+    # ── Injected tokenized styling and cross-iframe navigation script ──
+    t_bg = token("bg")
     t_surface = token("surface")
     t_border = token("border")
     t_hairline = token("border-width-hairline")
@@ -218,9 +239,51 @@ def build_map(
     css_label = type_css("label")
     css_price_sm = type_css("price-sm")
 
+    tile_filter = (
+        "mix-blend-mode: multiply; filter: grayscale(0.65) sepia(0.15) brightness(1.04) contrast(0.92);"
+        if is_osm
+        else "mix-blend-mode: multiply; filter: brightness(1.02) contrast(0.98);"
+    )
+
     popup_header_html = (
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap">\n'
         '<style>\n'
+        f'.leaflet-container {{\n'
+        f'  background-color: {t_bg} !important;\n'
+        f'  font-family: Figtree, system-ui, sans-serif !important;\n'
+        f'}}\n'
+        f'.leaflet-tile-pane {{\n'
+        f'  {tile_filter}\n'
+        f'}}\n'
+        f'.leaflet-bar {{\n'
+        f'  border-radius: {t_radius_button} !important;\n'
+        f'  overflow: hidden !important;\n'
+        f'  border: {t_hairline} solid {t_border} !important;\n'
+        f'  box-shadow: 0 1px 4px rgba(31, 35, 40, 0.12) !important;\n'
+        f'}}\n'
+        f'.leaflet-bar a {{\n'
+        f'  background-color: {t_surface} !important;\n'
+        f'  color: {t_text} !important;\n'
+        f'  border-bottom: {t_hairline} solid {t_border} !important;\n'
+        f'  transition: background-color 0.15s ease, color 0.15s ease !important;\n'
+        f'}}\n'
+        f'.leaflet-bar a:hover {{\n'
+        f'  background-color: {t_primary_tint} !important;\n'
+        f'  color: {t_primary} !important;\n'
+        f'}}\n'
+        f'.leaflet-bar a:last-child {{\n'
+        f'  border-bottom: none !important;\n'
+        f'}}\n'
+        f'.leaflet-control-attribution {{\n'
+        f'  background: rgba(254, 249, 235, 0.85) !important;\n'
+        f'  color: {t_text_muted} !important;\n'
+        f'  {css_caption} !important;\n'
+        f'  border-top-left-radius: 4px !important;\n'
+        f'  padding: 2px 6px !important;\n'
+        f'}}\n'
+        f'.leaflet-control-attribution a {{\n'
+        f'  color: {t_primary} !important;\n'
+        f'}}\n'
         '.leaflet-div-icon { background: transparent !important; border: none !important; }\n'
         f'.leaflet-popup-content-wrapper {{\n'
         f'  background: {t_surface} !important;\n'
@@ -271,7 +334,13 @@ def build_map(
     folium.Marker(
         location=[campus_lat, campus_lng],
         tooltip="You are here (UCL Main Quad)",
-        icon=folium.Icon(color="blue", icon="star", prefix="fa"),
+        icon=folium.DivIcon(
+            html=_campus_marker_icon_html(),
+            icon_size=(34, 34),
+            icon_anchor=(17, 17),
+            popup_anchor=(0, -17),
+            class_name="",
+        ),
     ).add_to(m)
 
     # ── Build lookup: shop_id → (rank, lunch) ──────────────────────────────
