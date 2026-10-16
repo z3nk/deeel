@@ -32,6 +32,7 @@ Read PLAN.md first. Read UI_BRIEF.md for the interface.
 ## Publishing reviewed data
 - `meal_deal.db` is gitignored and Streamlit Cloud's disk is ephemeral. Approved real data reaches the live app via `seed/approved.json` (`snapshot.py`): export with `python seed/load_seed.py --export` or the Review queue button, commit, push. Every instance syncs it on startup.
 - Placeholder (fallback) rows are kept only for shops with no approved real data.
+- Demo review entries: `seed/demo_pending.json` (+ photos in `seed/demo_photos/`) puts fully filled-in `demo-` records in the live Review queue on every startup (`snapshot.sync_demo_pending`). They are never ranked, shown to students, exported or used to fill other products; approving or rejecting one only removes it from the queue. Real photo tasks are in `db._SEED_TASKS`.
 
 ## Design system
 - design/tokens.json is the only source of colours, type and spacing; never hard-code them.

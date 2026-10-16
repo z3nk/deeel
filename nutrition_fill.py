@@ -43,7 +43,7 @@ def from_our_data(conn: sqlite3.Connection, barcode: str, wanted: list[str]) -> 
     found: dict = {}
     rows = conn.execute(
         "SELECT kcal, protein_g, ingredients_text, allergens, external_fields FROM items "
-        "WHERE barcode = ? AND status != 'rejected' ORDER BY status = 'approved' DESC, last_seen DESC",
+        "WHERE barcode = ? AND status != 'rejected' AND item_id NOT LIKE 'demo-%' ORDER BY status = 'approved' DESC, last_seen DESC",
         (barcode,),
     ).fetchall()
     for row in rows:
@@ -126,6 +126,7 @@ def fill_existing(conn: sqlite3.Connection, limit: int | None = None,
     """
     rows = conn.execute(
         "SELECT * FROM items WHERE status != 'rejected' AND source_image != 'fallback.jpg' "
+        "AND item_id NOT LIKE 'demo-%' "
         "AND (kcal IS NULL OR protein_g IS NULL OR ingredients_text IS NULL OR ingredients_text = '' "
         "OR allergens IS NULL OR allergens = '[]') ORDER BY status = 'approved' DESC, item_id"
         + (f" LIMIT {int(limit)}" if limit else "")

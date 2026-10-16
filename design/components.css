@@ -496,3 +496,14 @@ a[aria-label="Link to heading"], a.anchorjs-link { display: none !important; }
 
 /* ---------- Find screen header (A deeel for you) ---------- */
 .dl-find-title { margin: 0 0 var(--space-2); font-family: var(--font-display); color: var(--logo-green); }
+
+/* ---------- Splash: the D logo on first load (once per session, app.py _splash) ---------- */
+.dl-splash { position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); pointer-events: none; animation: dl-splash-out 0.5s ease 1.3s forwards; }
+.dl-splash img { width: 112px; height: 112px; animation: dl-splash-pop 0.8s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+@keyframes dl-splash-pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes dl-splash-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .dl-splash { animation-duration: 0.01s; animation-delay: 0.5s; }
+  .dl-splash img { animation: none; }
+}

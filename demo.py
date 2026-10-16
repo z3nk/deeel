@@ -15,7 +15,7 @@ from streamlit_folium import st_folium
 
 from map_view import build_map
 from models import Preferences
-from optimiser import get_results, shop_deal
+from optimiser import deal_price, get_results, separate_price, shop_deal
 from shop_images import logo_html
 
 
@@ -175,8 +175,9 @@ def _step_deal(data, render_card) -> None:
         return
     shop = primary.shop
     trio = (primary.main, primary.snack, primary.drink)
-    sep_price = None if any(i.price_gbp is None for i in trio) else sum(i.price_gbp for i in trio)
+    sep_price = separate_price(trio, DEMO_PREFS)
     deal = shop_deal(deals, shop.shop_id)
+    deal_now = deal_price(deal, DEMO_PREFS) if deal else None
     eligible = all(i.meal_deal_eligible for i in trio)
     st.markdown(
         f"{logo_html(shop)}At <b>{shop.name}</b>: {' + '.join(i.name for i in trio)}",
@@ -189,19 +190,19 @@ def _step_deal(data, render_card) -> None:
             if deal is None:
                 st.markdown("**No deal at this shop**")
             elif not eligible:
-                st.markdown(f"**£{deal.price_gbp:.2f}** — not available")
+                st.markdown(f"**£{deal_now:.2f}** — not available")
                 st.caption("One of these items isn't in the meal deal.")
             else:
-                st.markdown(f"**£{deal.price_gbp:.2f}**")
+                st.markdown(f"**£{deal_now:.2f}**")
                 if sep_price is None:
                     st.caption("✅ Best option — some items are only sold in the deal")
-                elif deal.price_gbp < sep_price:
-                    st.caption(f"✅ Best option — saves £{sep_price - deal.price_gbp:.2f}")
+                elif deal_now < sep_price:
+                    st.caption(f"✅ Best option — saves £{sep_price - deal_now:.2f}")
     with c2:
         with st.container(border=True):
             st.caption("Bought separately")
             st.markdown("**Not available**" if sep_price is None else f"**£{sep_price:.2f}**")
-            if sep_price is not None and (deal is None or not eligible or deal.price_gbp >= sep_price):
+            if sep_price is not None and (deal is None or not eligible or deal_now >= sep_price):
                 st.caption("✅ Best option")
     st.caption("Tap **See basket** on any result to swap items and watch the price update.")
 

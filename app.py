@@ -11,11 +11,13 @@ Screens:
 
 from __future__ import annotations
 
+import base64
 import html
 import json
 import re
 from html import escape
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 
 import streamlit as st
@@ -55,6 +57,9 @@ from optimiser import (
     lunch_deeel,
     hard_filter,
     best_lunch_for_shop,
+    deal_price,
+    effective_price,
+    separate_price,
     _row_to_item,
     _row_to_shop,
     _row_to_deal,
@@ -77,6 +82,23 @@ st.set_page_config(
 )
 inject_theme()   # design system: fonts, :root tokens, .dl-* classes (design/tokens.json)
 
+
+@lru_cache(maxsize=1)
+def _splash_logo_b64() -> str:
+    return base64.b64encode((BRAND_DIR / "logo-icon-192.png").read_bytes()).decode("ascii")
+
+
+def _splash() -> None:
+    """The D logo over the cream page, once per session on first load (CSS fades it out)."""
+    if st.session_state.get("_splash_done"):
+        return
+    st.session_state["_splash_done"] = True
+    st.markdown(f'<div class="dl-splash" aria-hidden="true"><img alt="" '
+                f'src="data:image/png;base64,{_splash_logo_b64()}"></div>', unsafe_allow_html=True)
+
+
+_splash()
+
 # ---------------------------------------------------------------------------
 # DB + cached data loaders
 # ---------------------------------------------------------------------------
@@ -93,7 +115,7 @@ def _load_data():
     items  = [_row_to_item(r)  for r in fetch_approved_items(conn)]
     # also include pending items (shown with Unverified tag when no allergen filter)
     pending_rows = conn.execute(
-        "SELECT * FROM items WHERE status = 'pending'"
+        "SELECT * FROM items WHERE status = 'pending' AND item_id NOT LIKE 'demo-%'"
     ).fetchall()
     pending = [_row_to_item(r) for r in pending_rows]
     deals  = [_row_to_deal(r)  for r in fetch_approved_deals(conn)]
@@ -384,8 +406,11 @@ def _fmt_price(item) -> str:
     return "meal deal only" if item.price_gbp is None else f"£{item.price_gbp:.2f}"
 
 
-def _separate_total(items_list) -> float | None:
-    """Total bought separately, or None if any item is only sold in the meal deal."""
+def _separate_total(items_list, prefs: Preferences | None = None) -> float | None:
+    """Total bought separately, or None if any item is only sold in the meal deal.
+    With prefs, items use the card price for the shopper's own loyalty cards."""
+    if prefs is not None:
+        return separate_price(items_list, prefs)
     return None if any(i.price_gbp is None for i in items_list) else sum(i.price_gbp for i in items_list)
 
 
@@ -452,9 +477,9 @@ def _allergen_line_html(items_list, warn: bool = False) -> str:
     return f'<div class="dl-allergen-line dl-card__note">{escape(text)}{warning}</div>'
 
 
-def _deal_html(lunch) -> str:
+def _deal_html(lunch, prefs: Preferences | None = None) -> str:
     """Deal state for the price row. The savings sticker is the only hype element on the card."""
-    sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink])
+    sep_price = _separate_total([lunch.main, lunch.snack, lunch.drink], prefs)
     if lunch.used_deal and sep_price is None:
         return '<span class="dl-plain-deal">Meal deal — some items are only priced as part of the deal</span>'
     if lunch.used_deal and sep_price > lunch.price_gbp:
@@ -510,7 +535,7 @@ def render_result_card(lunch, rank: int, prefs: Preferences, featured: bool = Fa
 
     price_cls = "dl-card__price" if featured else "dl-card__price dl-card__price--sm"
     body.append(f'<div class="dl-card__price-row"><span class="{price_cls}">£{lunch.price_gbp:.2f}</span>'
-                f'{_deal_html(lunch)}{fresh}</div>')
+                f'{_deal_html(lunch, prefs)}{fresh}</div>')
 
     card_cls = "dl-card dl-card--in-st" + (" dl-card--featured" if featured else "")
     with st.container(border=True):
@@ -803,13 +828,16 @@ def _item_allergen_html(item) -> str:
     return f'<div class="dl-allergen-line">Allergens: {allergens}</div>'
 
 
-def _price_html(item) -> str:
+def _price_html(item, prefs: Preferences | None = None) -> str:
     if item.price_gbp is None:
         return '<span class="dl-item__dealonly">meal deal only</span>'
-    return f'<span class="dl-item__price">£{item.price_gbp:.2f}</span>'
+    price = effective_price(item, prefs) if prefs is not None else item.price_gbp
+    card = (' <span class="dl-badge dl-badge--credits">card price</span>'
+            if price is not None and price < item.price_gbp else "")
+    return f'<span class="dl-item__price">£{price:.2f}</span>{card}'
 
 
-def _item_info_html(item) -> str:
+def _item_info_html(item, prefs: Preferences | None = None) -> str:
     """Name, price, tags, allergens, nutrition and freshness under a shop-page picker."""
     tags = []
     if item.temperature == "hot":
@@ -821,7 +849,7 @@ def _item_info_html(item) -> str:
     return (
         f'<div class="dl-item">'
         f'<div class="dl-item__name">{escape(item.name)}</div>'
-        f'<div class="dl-item__row">{_price_html(item)}{"".join(tags)}</div>'
+        f'<div class="dl-item__row">{_price_html(item, prefs)}{"".join(tags)}</div>'
         f'{_item_allergen_html(item)}'
         f'<div class="dl-item__meta">{escape(_item_nutrition(item))}</div>'
         f'<div class="dl-item__row">{_freshness_badge(str(item.last_seen))}</div>'
@@ -829,22 +857,27 @@ def _item_info_html(item) -> str:
     )
 
 
-def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: bool) -> str:
+def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: bool,
+                       price: float | None = None) -> str:
     """DealComparison: meal deal vs bought separately; the winner has the border AND the words."""
+    price = deal.price_gbp if (price is None and deal is not None) else price
+    card_note = (f'<div class="dl-compare__note">{escape(deal.loyalty_scheme or "Card")} price '
+                 f'(£{deal.price_gbp:.2f} without)</div>'
+                 if deal is not None and price < deal.price_gbp else "")
     if deal is None:
         deal_body = '<div class="dl-compare__na">No deal at this shop</div>'
     elif not deal_eligible:
         deal_body = (f'<div class="dl-compare__na">Not available</div>'
-                     f'<div class="dl-compare__note">£{deal.price_gbp:.2f} deal — an item you picked '
+                     f'<div class="dl-compare__note">£{price:.2f} deal — an item you picked '
                      f"isn't in the meal deal.</div>")
     else:
         note = ""
         if is_deal_better and sep_price is not None:
             note = (f'<div class="dl-compare__note dl-compare__note--win">'
-                    f'✓ Best option — saves £{sep_price - deal.price_gbp:.2f}</div>')
+                    f'✓ Best option — saves £{sep_price - price:.2f}</div>')
         elif is_deal_better:
             note = '<div class="dl-compare__note dl-compare__note--win">✓ Best option</div>'
-        deal_body = f'<div class="dl-compare__price">£{deal.price_gbp:.2f}</div>{note}'
+        deal_body = f'<div class="dl-compare__price">£{price:.2f}</div>{card_note}{note}'
 
     sep_win = not is_deal_better and sep_price is not None
     if sep_price is None:
@@ -865,7 +898,7 @@ def _deal_compare_html(deal, deal_eligible: bool, sep_price, is_deal_better: boo
     )
 
 
-def screen_detail():
+def screen_detail(prefs: Preferences | None = None):
     shops, all_items, deals = _load_data()
     shop_id = st.session_state.get("detail_shop_id")
     shop = next((s for s in shops if s.shop_id == shop_id), None)
@@ -919,7 +952,11 @@ def screen_detail():
     # The pickers start at index 0 and "Reset to best basket" returns there, so put the
     # shop's best lunch first (otherwise index 0 could be an unbuyable combination, e.g. a
     # main outside the deal with a deal-only drink)
-    best = best_lunch_for_shop(shop, hard_filter(shop_items, Preferences()), shop_deals, Preferences())
+    # Show everything at this shop (no diet/allergy filtering), but price it with the
+    # shopper's own loyalty cards
+    cards = ("has_clubcard", "has_nectar", "has_lidl_plus", "has_sparks", "has_mywaitrose", "has_club_pret")
+    price_prefs = Preferences(**{c: getattr(prefs, c) for c in cards}) if prefs is not None else Preferences()
+    best = best_lunch_for_shop(shop, hard_filter(shop_items, Preferences()), shop_deals, price_prefs)
     if best is not None:
         for options, pick in ((mains, best.main), (snacks, best.snack), (drinks, best.drink)):
             options.sort(key=lambda i, pick=pick: i.item_id != pick.item_id)
@@ -945,7 +982,7 @@ def screen_detail():
                 idx = 0
             st.session_state[f"{key_prefix}_{cat}"] = idx
             picked[cat] = (idx, options[idx])
-            st.markdown(_item_info_html(options[idx]), unsafe_allow_html=True)
+            st.markdown(_item_info_html(options[idx], price_prefs), unsafe_allow_html=True)
     (main_idx, main), (snack_idx, snack), (drink_idx, drink) = picked["main"], picked["snack"], picked["drink"]
 
     # Reset button
@@ -956,18 +993,18 @@ def screen_detail():
             st.rerun()
 
     # Pricing comparison
-    sep_price = _separate_total([main, snack, drink])   # None = a deal-only item is picked
+    sep_price = _separate_total([main, snack, drink], price_prefs)   # None = a deal-only item is picked
     deal_eligible = (
         main.meal_deal_eligible is not False
         and snack.meal_deal_eligible is not False
         and drink.meal_deal_eligible is not False
     )
     deal = shop_deal(shop_deals, shop_id)
-    deal_price = deal.price_gbp if deal else None
-    is_deal_better = deal_price is not None and deal_eligible and (sep_price is None or deal_price < sep_price)
+    shown_deal_price = deal_price(deal, price_prefs) if deal else None
+    is_deal_better = shown_deal_price is not None and deal_eligible and (sep_price is None or shown_deal_price < sep_price)
 
     _heading(2, "Meal deal or separate?")
-    st.markdown(_deal_compare_html(deal, deal_eligible, sep_price, is_deal_better), unsafe_allow_html=True)
+    st.markdown(_deal_compare_html(deal, deal_eligible, sep_price, is_deal_better, shown_deal_price), unsafe_allow_html=True)
 
     st.divider()
 
@@ -1683,7 +1720,7 @@ def main():
     if screen == "find":
         screen_find(prefs)
     elif screen == "detail":
-        screen_detail()
+        screen_detail(prefs)
     elif screen == "upload":
         screen_upload()
     elif screen == "credits":

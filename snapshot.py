@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SNAPSHOT_PATH = Path(__file__).parent / "seed" / "approved.json"
+DEMO_PATH = Path(__file__).parent / "seed" / "demo_pending.json"
+DEMO_PHOTOS = Path(__file__).parent / "seed" / "demo_photos"
 _FALLBACK_IMAGE = "fallback.jpg"
 _JSON_COLUMNS = {"diet_flags", "allergens", "meats", "external_fields"}
 
@@ -80,7 +82,8 @@ def export_snapshot(conn: sqlite3.Connection, path: Path | None = None) -> dict:
     path = path or SNAPSHOT_PATH   # looked up at call time so tests can redirect it
     items = []
     for row in conn.execute(
-        "SELECT * FROM items WHERE status = 'approved' AND source_image != ? ORDER BY shop_id, category, name",
+        "SELECT * FROM items WHERE status = 'approved' AND source_image != ? AND item_id NOT LIKE 'demo-%' "
+        "ORDER BY shop_id, category, name",
         (_FALLBACK_IMAGE,),
     ):
         d = dict(row)
@@ -88,7 +91,8 @@ def export_snapshot(conn: sqlite3.Connection, path: Path | None = None) -> dict:
             d[col] = json.loads(d[col]) if d[col] else ([] if col in ("diet_flags", "allergens") else None)
         items.append(d)
     deals = _one_deal_per_shop([dict(r) for r in conn.execute(
-        "SELECT * FROM deals WHERE status = 'approved' AND source_image != ? ORDER BY shop_id, name",
+        "SELECT * FROM deals WHERE status = 'approved' AND source_image != ? AND deal_id NOT LIKE 'demo-%' "
+        "ORDER BY shop_id, name",
         (_FALLBACK_IMAGE,),
     )])
     payload = {
@@ -140,3 +144,50 @@ def sync_snapshot(conn: sqlite3.Connection, path: Path | None = None) -> bool:
     _meta_set(conn, "snapshot_hash", digest)
     conn.commit()
     return True
+
+
+def sync_demo_pending(conn: sqlite3.Connection, path: Path | None = None,
+                      photos: Path | None = None, upload_root: Path | None = None) -> int:
+    """
+    Put the demo submissions (seed/demo_pending.json) in the Review queue as pending, with
+    their photos, so the live site always has fully filled-in entries to review.
+
+    - Ids start 'demo-': they are never ranked, shown to students, exported to the snapshot
+      or used to fill other products. Approving or rejecting one only removes it from the queue.
+    - INSERT OR IGNORE: a demo entry that was approved or rejected is never put back, even
+      though this runs on every startup. (A fresh deploy has a fresh database, so they return.)
+    Returns the number of records newly queued.
+    """
+    from datetime import date
+    import shutil
+    from photo_store import UPLOAD_ROOT
+
+    path = path or DEMO_PATH
+    photos = photos or DEMO_PHOTOS
+    upload_root = upload_root or UPLOAD_ROOT
+    if not path.exists():
+        return 0
+    data = json.loads(path.read_text(encoding="utf-8"))
+    today = date.today().isoformat()
+    item_cols, deal_cols = set(_columns(conn, "items")), set(_columns(conn, "deals"))
+    queued = 0
+    for table, rows, cols, id_col in (("items", data.get("items", []), item_cols, "item_id"),
+                                      ("deals", data.get("deals", []), deal_cols, "deal_id")):
+        for row in rows:
+            assert row[id_col].startswith("demo-"), f"demo records need a 'demo-' id: {row[id_col]}"
+            record = {k: v for k, v in row.items() if k in cols}
+            record.update(status="pending", last_seen=today)
+            for col in _JSON_COLUMNS & record.keys():
+                if record[col] is None and col in ("diet_flags", "allergens"):
+                    record[col] = []
+                if record[col] is not None and not isinstance(record[col], str):
+                    record[col] = json.dumps(record[col])
+            names, marks = ", ".join(record), ", ".join(f":{k}" for k in record)
+            queued += conn.execute(f"INSERT OR IGNORE INTO {table} ({names}) VALUES ({marks})", record).rowcount
+            src = photos / row["source_image"]
+            dest = upload_root / row["source_image"]
+            if src.exists() and not dest.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+    conn.commit()
+    return queued

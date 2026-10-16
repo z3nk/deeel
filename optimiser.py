@@ -694,3 +694,9 @@ Respond with only the sentence, no punctuation at the end.
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text.strip()
+
+
+# Public names for the UI: loyalty-aware prices for the shopper's own cards (prefs.has_*).
+effective_price = _effective_price      # one item
+deal_price = _deal_price                # the meal deal
+separate_price = _separate_price        # a basket bought separately (None = a deal-only item)

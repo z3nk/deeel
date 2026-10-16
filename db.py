@@ -233,6 +233,60 @@ _SEED_TASKS = [
         "ask": "Photograph the shelf edge label. Check if there's a meal deal sticker.",
         "bonus_credits": 10,
     },
+    {
+        "task_id": "task-waitrose-deal-sign",
+        "shop_id": "waitrose-brunswick",
+        "item_name": "Waitrose meal deal sign",
+        "needed": "deal price + myWaitrose price",
+        "photo_type": "general",
+        "ask": "Photograph the whole meal deal sign. Include the myWaitrose price if it is shown.",
+        "bonus_credits": 15,
+    },
+    {
+        "task_id": "task-ms-deal-sign",
+        "shop_id": "ms-tcr",
+        "item_name": "M&S meal deal sign",
+        "needed": "deal price + Sparks price",
+        "photo_type": "general",
+        "ask": "Get the full meal deal sign in frame, price sharp. Add the Sparks price if there is one.",
+        "bonus_credits": 15,
+    },
+    {
+        "task_id": "task-lidl-sandwich-shelf",
+        "shop_id": "lidl-tcr",
+        "item_name": "Chilled sandwiches and wraps",
+        "needed": "price + allergens",
+        "photo_type": "main",
+        "ask": "Photograph each sandwich or wrap so the price tag and the allergen line are both readable.",
+        "bonus_credits": 10,
+    },
+    {
+        "task_id": "task-pret-snack-shelf",
+        "shop_id": "pret-tcr",
+        "item_name": "Crisps and snack bars",
+        "needed": "price + allergens",
+        "photo_type": "snack",
+        "ask": "Photograph the snack shelf, close enough that the prices and the allergen text can be read.",
+        "bonus_credits": 10,
+    },
+    {
+        "task_id": "task-sainsburys-chicken-stuffing-wrap",
+        "shop_id": "sainsburys-warren-st",
+        "item_name": "Chicken & Stuffing Wrap",
+        "needed": "calories + protein + ingredients",
+        "photo_type": "main",
+        "ask": "Turn the pack over and photograph the nutrition table and the ingredients list.",
+        "bonus_credits": 10,
+    },
+    {
+        "task_id": "task-tesco-coke-zero",
+        "shop_id": "tesco-tcr",
+        "item_name": "Coca-Cola Zero Sugar",
+        "needed": "barcode + nutrition",
+        "photo_type": "drink",
+        "ask": "Photograph the back of the can or bottle: the barcode, the nutrition table and the ingredients.",
+        "bonus_credits": 5,
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -360,7 +414,7 @@ def _auto_seed_items(conn: sqlite3.Connection) -> None:
     2. The approved-data snapshot (seed/approved.json), if present — see snapshot.py.
     3. Placeholders removed for shops that now have approved real data.
     """
-    from snapshot import meta_get, meta_set, prune_placeholders, sync_snapshot
+    from snapshot import meta_get, meta_set, prune_placeholders, sync_demo_pending, sync_snapshot
 
     if meta_get(conn, "fallback_version") != str(FALLBACK_DATA_VERSION):
         conn.execute("DELETE FROM items WHERE source_image = 'fallback.jpg'")
@@ -371,6 +425,7 @@ def _auto_seed_items(conn: sqlite3.Connection) -> None:
 
     sync_snapshot(conn)
     prune_placeholders(conn)
+    sync_demo_pending(conn)
 
 
 def _load_fallback(conn: sqlite3.Connection) -> None:
@@ -463,20 +518,20 @@ def fetch_all_shops(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 def fetch_approved_items(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT * FROM items WHERE status = 'approved'"
+        "SELECT * FROM items WHERE status = 'approved' AND item_id NOT LIKE 'demo-%'"
     ).fetchall()
 
 
 def fetch_items_for_shop(conn: sqlite3.Connection, shop_id: str) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT * FROM items WHERE shop_id = ? AND status IN ('approved', 'pending')",
+        "SELECT * FROM items WHERE shop_id = ? AND status IN ('approved', 'pending') AND item_id NOT LIKE 'demo-%'",
         (shop_id,),
     ).fetchall()
 
 
 def fetch_approved_deals(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
-        "SELECT * FROM deals WHERE status = 'approved'"
+        "SELECT * FROM deals WHERE status = 'approved' AND deal_id NOT LIKE 'demo-%'"
     ).fetchall()
 
 

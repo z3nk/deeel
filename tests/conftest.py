@@ -12,6 +12,12 @@ def no_real_snapshot(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_real_demo_entries(tmp_path, monkeypatch):
+    """Nor the demo review entries (they would copy photos into the real uploads/ folder)."""
+    monkeypatch.setattr(snapshot, "DEMO_PATH", tmp_path / "no-demo.json")
+
+
+@pytest.fixture(autouse=True)
 def no_network(monkeypatch):
     """Tests never call Open Food Facts; tests that need it patch these themselves."""
     import openfoodfacts
